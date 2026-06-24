@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Trophy, Medal, Star, RefreshCw } from 'lucide-react';
 import { rankingsApi } from '../../api';
-import caulongIcon from '../../assets/images/cau-long-icon.png';
 
 const LEVEL_CONFIG: Record<string, { cls: string; emoji: string }> = {
     'Cố định (tháng)': { cls: 'bg-purple-100 text-purple-800 border-purple-300', emoji: '🏆' },
@@ -15,7 +14,7 @@ const LEVEL_CONFIG: Record<string, { cls: string; emoji: string }> = {
 function Shuttlecock({ size = 20 }: { size?: number }) {
     return (
         <img
-            src={caulongIcon}
+            src='https://res.cloudinary.com/ds6mtnyyk/image/upload/v1782118304/cau-long-icon_qeymuc.png'
             alt="cầu lông"
             width={size}
             height={size}

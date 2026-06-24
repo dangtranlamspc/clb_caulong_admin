@@ -2,21 +2,72 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Plus, Download, Filter, ChevronLeft, ChevronRight,
-  UserCog, Trash2, ToggleLeft, ToggleRight, Eye, MoreVertical
+  Trash2, ToggleLeft, ToggleRight, Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { usersApi } from '../../api';
 import { format } from 'date-fns';
 
-const GENDER_LABEL = { male: 'Nam', female: 'Nữ', other: 'Khác' };
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+
+const LEVEL_LABEL: Record<string, string> = {
+  yeu: 'Yếu',
+  tb_yeu: 'TB yếu',
+  tb: 'TB',
+  tb_plus: 'TB+',
+  ban_chuyen: 'BC',
+  chuyen_nghiep: 'Chuyên nghiệp',
+};
+
+const LEVEL_OPTIONS = [
+  { value: '', label: 'Tất cả trình độ' },
+  { value: 'yeu', label: 'Yếu' },
+  { value: 'tb_yeu', label: 'TB yếu' },
+  { value: 'tb', label: 'TB' },
+  { value: 'tb_plus', label: 'TB+' },
+  { value: 'ban_chuyen', label: 'Bán chuyên (BC)' },
+  { value: 'chuyen_nghiep', label: 'Chuyên nghiệp' },
+];
+
+function MemberTypeBadge({ user }: { user: any }) {
+  if (user.member_type === 'co_dinh') {
+    const isVip = user.member_subtype === 'vip';
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 w-fit">
+          Thành viên
+        </span>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium w-fit ${isVip ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'
+          }`}>
+          {isVip ? '⭐ VIP' : 'Thường'}
+        </span>
+      </div>
+    );
+  }
+
+  const isQuen = user.vang_lai_status === 'khach_quen';
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 w-fit">
+        Vãng lai
+      </span>
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium w-fit ${isQuen ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-600'
+        }`}>
+        {user.vang_lai_label ?? (isQuen ? 'Khách quen' : 'Khách mới')}
+        {typeof user.attendance_count === 'number' && (
+          <span className="opacity-60"> · {user.attendance_count}</span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 export default function MembersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [meta, setMeta] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState({
-    search: '', role: '', gender: '', shirt_size: '', is_active: '', member_type: '',
+    search: '', role: '', gender: '', shirt_size: '', is_active: '', member_type: '', level: '',
     page: 1, limit: 20,
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -127,7 +178,7 @@ export default function MembersPage() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-gray-100">
             <select
               value={query.role}
               onChange={e => setQuery(q => ({ ...q, role: e.target.value, page: 1 }))}
@@ -161,9 +212,17 @@ export default function MembersPage() {
               onChange={e => setQuery(q => ({ ...q, member_type: e.target.value, page: 1 }))}
               className="input-field text-sm"
             >
-              <option value="">Tất cả loại</option>
+              <option value="">Tất cả phân cấp</option>
               <option value="vang_lai">Vãng lai</option>
-              <option value="co_dinh">Cố định</option>
+              <option value="co_dinh">Thành viên</option>
+            </select>
+
+            <select
+              value={query.level}
+              onChange={e => setQuery(q => ({ ...q, level: e.target.value, page: 1 }))}
+              className="input-field text-sm"
+            >
+              {LEVEL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
 
             <select
@@ -188,9 +247,9 @@ export default function MembersPage() {
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Họ và tên</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 hidden md:table-cell">Email</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 hidden sm:table-cell">SĐT</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 hidden lg:table-cell">Size áo</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 hidden lg:table-cell">Trình độ</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Vai trò</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 hidden sm:table-cell">Loại</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 hidden sm:table-cell">Phân cấp</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Trạng thái</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600">Thao tác</th>
               </tr>
@@ -199,7 +258,7 @@ export default function MembersPage() {
               {loading ? (
                 [...Array(8)].map((_, i) => (
                   <tr key={i}>
-                    {[...Array(7)].map((_, j) => (
+                    {[...Array(8)].map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-gray-100 rounded animate-pulse" />
                       </td>
@@ -223,8 +282,12 @@ export default function MembersPage() {
                   <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{user.email}</td>
                   <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{user.phone}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    {user.shirt_size && (
-                      <span className="px-2 py-0.5 bg-gray-100 rounded text-xs font-medium">{user.shirt_size}</span>
+                    {user.level ? (
+                      <span className="px-2 py-0.5 bg-violet-50 text-violet-700 rounded text-xs font-medium">
+                        {LEVEL_LABEL[user.level] ?? user.level}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -233,13 +296,7 @@ export default function MembersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
-                    <span className={
-                      user.member_type === 'co_dinh'
-                        ? 'px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700'
-                        : 'px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600'
-                    }>
-                      {user.member_type === 'co_dinh' ? 'Cố định' : 'Vãng lai'}
-                    </span>
+                    <MemberTypeBadge user={user} />
                   </td>
                   <td className="px-4 py-3">
                     <span className={user.is_active ? 'badge-active' : 'badge-inactive'}>

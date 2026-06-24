@@ -7,6 +7,16 @@ import { usersApi } from '../../api';
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 
+const LEVEL_OPTIONS = [
+  { value: '', label: 'Chưa xác định' },
+  { value: 'yeu', label: 'Yếu' },
+  { value: 'tb_yeu', label: 'TB yếu' },
+  { value: 'tb', label: 'TB' },
+  { value: 'tb_plus', label: 'TB+' },
+  { value: 'ban_chuyen', label: 'Bán chuyên (BC)' },
+  { value: 'chuyen_nghiep', label: 'Chuyên nghiệp' },
+];
+
 export default function MemberFormPage() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
@@ -15,23 +25,35 @@ export default function MemberFormPage() {
   const [fetching, setFetching] = useState(isEdit);
   const [showResetPw, setShowResetPw] = useState(false);
   const [newPw, setNewPw] = useState('');
+  const [attendanceInfo, setAttendanceInfo] = useState<{ count: number; label: string } | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm();
+  const memberType = watch('member_type');
 
   useEffect(() => {
     if (isEdit) {
       usersApi.get(id!)
-        .then(({ data }) => reset({
-          full_name: data.full_name,
-          email: data.email,
-          phone: data.phone,
-          date_of_birth: data.date_of_birth?.split('T')[0] ?? '',
-          gender: data.gender ?? '',
-          shirt_size: data.shirt_size ?? '',
-          role: data.role,
-          member_type: data.member_type ?? 'vang_lai',
-          is_active: data.is_active,
-        }))
+        .then(({ data }) => {
+          reset({
+            full_name: data.full_name,
+            email: data.email,
+            phone: data.phone,
+            date_of_birth: data.date_of_birth?.split('T')[0] ?? '',
+            gender: data.gender ?? '',
+            shirt_size: data.shirt_size ?? '',
+            role: data.role,
+            member_type: data.member_type ?? 'vang_lai',
+            member_subtype: data.member_subtype ?? 'thuong',
+            level: data.level ?? '',
+            is_active: data.is_active,
+          });
+          if (data.member_type === 'vang_lai') {
+            setAttendanceInfo({
+              count: data.attendance_count ?? 0,
+              label: data.vang_lai_label ?? 'Khách mới',
+            });
+          }
+        })
         .finally(() => setFetching(false));
     }
   }, [id]);
@@ -49,6 +71,8 @@ export default function MemberFormPage() {
           shirt_size: values.shirt_size || undefined,
           role: values.role,
           member_type: values.member_type || undefined,
+          member_subtype: values.member_type === 'co_dinh' ? (values.member_subtype || 'thuong') : undefined,
+          level: values.level || undefined,
           is_active: values.is_active,
         };
         await usersApi.update(id!, payload);
@@ -64,6 +88,8 @@ export default function MemberFormPage() {
           gender: values.gender || undefined,
           shirt_size: values.shirt_size || undefined,
           member_type: values.member_type || 'vang_lai',
+          member_subtype: values.member_type === 'co_dinh' ? (values.member_subtype || 'thuong') : undefined,
+          level: values.level || undefined,
           role: values.role || 'member',
         };
         await usersApi.create(payload);
@@ -195,13 +221,47 @@ export default function MemberFormPage() {
             </select>
           </div>
 
+          {/* Trình độ */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Loại thành viên</label>
-            <select {...register('member_type')} className="input-field">
-              <option value="vang_lai">Vãng lai</option>
-              <option value="co_dinh">Cố định</option>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Trình độ</label>
+            <select {...register('level')} className="input-field">
+              {LEVEL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+
+          {/* Member type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phân cấp thành viên</label>
+            <select {...register('member_type')} className="input-field">
+              <option value="vang_lai">Vãng lai</option>
+              <option value="co_dinh">Thành viên</option>
+            </select>
+          </div>
+
+          {/* Member subtype — chỉ hiện khi là "Thành viên" */}
+          {memberType === 'co_dinh' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Loại thành viên</label>
+              <select {...register('member_subtype')} className="input-field">
+                <option value="thuong">Thường</option>
+                <option value="vip">VIP</option>
+              </select>
+            </div>
+          )}
+
+          {/* Vãng lai — hiển thị thông tin Khách mới/Khách quen (tính tự động, không sửa) */}
+          {memberType === 'vang_lai' && attendanceInfo && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phân loại vãng lai</label>
+              <div className="input-field bg-gray-50 text-gray-600 flex items-center justify-between">
+                <span>{attendanceInfo.label}</span>
+                <span className="text-xs text-gray-400">{attendanceInfo.count} lần tham gia</span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Tự động xác định: &lt; 5 lần = Khách mới, ≥ 5 lần = Khách quen
+              </p>
+            </div>
+          )}
 
           {/* Role */}
           <div>
