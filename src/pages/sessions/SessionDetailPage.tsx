@@ -3,11 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
     ArrowLeft, CalendarDays, MapPin, Clock, Users,
     CheckCircle2, XCircle, Hourglass, Phone, Mail,
+    UserPlus, Search, Loader2, Eye,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { sessionsApi, registrationsApi } from '../../api';
+import { sessionsApi, registrationsApi, usersApi } from '../../api';
 import SessionCostCard from './SessionCostCard';
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> = {
@@ -15,40 +16,6 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> =
     confirmed: { label: 'Đã xác nhận', cls: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2 },
     rejected: { label: 'Từ chối', cls: 'bg-red-50 text-red-600 border-red-200', icon: XCircle },
 };
-
-function UserAvatar({
-    avatarUrl,
-    fullName,
-    size = 36,
-}: {
-    avatarUrl?: string | null;
-    fullName?: string;
-    size?: number;
-}) {
-    const [error, setError] = useState(false);
-
-    const showImage = avatarUrl && !error;
-
-    return (
-        <div
-            className="rounded-full overflow-hidden bg-blue-100 flex items-center justify-center flex-shrink-0"
-            style={{ width: size, height: size }}
-        >
-            {showImage ? (
-                <img
-                    src={avatarUrl}
-                    alt={fullName}
-                    className="w-full h-full object-cover"
-                    onError={() => setError(true)}
-                />
-            ) : (
-                <span className="text-blue-700 text-sm font-semibold">
-                    {fullName?.[0]?.toUpperCase() ?? '?'}
-                </span>
-            )}
-        </div>
-    );
-}
 
 export default function SessionDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -59,6 +26,19 @@ export default function SessionDetailPage() {
     const [actionId, setActionId] = useState<string | null>(null);
     const [rejectNotes, setRejectNotes] = useState<Record<string, string>>({});
     const [showReject, setShowReject] = useState<string | null>(null);
+
+    // ── Xem ảnh bill chuyển khoản ──────────────────────────────────
+    const [viewingBillUrl, setViewingBillUrl] = useState<string | null>(null);
+
+    // ── Add member modal ──────────────────────────────────────────
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [search, setSearch] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [selectedMember, setSelectedMember] = useState<any>(null);
+    const [addConfirmNow, setAddConfirmNow] = useState(false);
+    const [addNotes, setAddNotes] = useState('');
+    const [adding, setAdding] = useState(false);
 
     const fetchAll = async () => {
         setLoading(true);
@@ -75,6 +55,22 @@ export default function SessionDetailPage() {
     };
 
     useEffect(() => { fetchAll(); }, [id]);
+
+    // Debounce tìm kiếm thành viên trong modal
+    useEffect(() => {
+        if (!showAddModal) return;
+        if (search.trim().length < 2) { setSearchResults([]); return; }
+        const t = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const { data } = await usersApi.searchMembers(search.trim());
+                setSearchResults(data ?? []);
+            } finally {
+                setSearching(false);
+            }
+        }, 350);
+        return () => clearTimeout(t);
+    }, [search, showAddModal]);
 
     const handleConfirm = async (regId: string) => {
         setActionId(regId);
@@ -99,6 +95,33 @@ export default function SessionDetailPage() {
         }
     };
 
+    const closeAddModal = () => {
+        setShowAddModal(false);
+        setSearch('');
+        setSearchResults([]);
+        setSelectedMember(null);
+        setAddConfirmNow(false);
+        setAddNotes('');
+    };
+
+    const handleAddMember = async () => {
+        if (!selectedMember) return;
+        setAdding(true);
+        try {
+            await registrationsApi.adminAdd({
+                session_id: id,
+                user_id: selectedMember.id,
+                payment_status: addConfirmNow ? 'confirmed' : 'pending',
+                notes: addNotes || undefined,
+            });
+            toast.success(`Đã thêm ${selectedMember.full_name} vào buổi${addConfirmNow ? '' : ' — đã gửi thông báo thanh toán'}`);
+            closeAddModal();
+            fetchAll();
+        } finally {
+            setAdding(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="space-y-4 max-w-3xl mx-auto">
@@ -120,6 +143,8 @@ export default function SessionDetailPage() {
         session.status === 'completed' &&
         (Number(session.court_fee ?? 0) > 0 || Number(session.shuttle_count ?? 0) > 0);
 
+    const canAddMember = session.status === 'open' || session.status === 'full';
+
     return (
         <div className="max-w-3xl mx-auto space-y-4">
             {/* Header */}
@@ -128,6 +153,14 @@ export default function SessionDetailPage() {
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h1 className="text-xl font-bold text-gray-900 flex-1 truncate">{session.title}</h1>
+                {canAddMember && (
+                    <button
+                        onClick={() => setShowAddModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors flex-shrink-0"
+                    >
+                        <UserPlus className="w-4 h-4" /> Thêm thành viên
+                    </button>
+                )}
             </div>
 
             {/* Session info card */}
@@ -200,11 +233,9 @@ export default function SessionDetailPage() {
                                     <div className="flex items-start gap-3">
                                         {/* Avatar */}
                                         <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                            <UserAvatar
-                                                avatarUrl={user?.avatar_url}
-                                                fullName={user?.full_name}
-                                                size={36}
-                                            />
+                                            <span className="text-blue-700 text-sm font-semibold">
+                                                {user?.full_name?.[0]?.toUpperCase() ?? '?'}
+                                            </span>
                                         </div>
 
                                         {/* Info */}
@@ -217,7 +248,7 @@ export default function SessionDetailPage() {
                                                         ? 'bg-purple-50 text-purple-700 border-purple-200'
                                                         : 'bg-gray-50 text-gray-500 border-gray-200'
                                                         }`}>
-                                                        {user.member_type === 'co_dinh' ? '🔵 Cố định' : '⚪ Vãng lai'}
+                                                        {user.member_type === 'co_dinh' ? '🔵 Thành viên' : '⚪ Vãng lai'}
                                                     </span>
                                                 )}
                                                 <span className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 ${cfg.cls}`}>
@@ -250,26 +281,48 @@ export default function SessionDetailPage() {
                                             )}
                                         </div>
 
-                                        {/* Action buttons */}
-                                        {reg.payment_status === 'pending' && (
+                                        {/* Action buttons + xem bill — chỉ hiện khi có ảnh bill hoặc member đã gửi mã chuyển khoản */}
+                                        {(reg.payment_proof_url || (reg.payment_status === 'pending' && reg.payment_reference)) && (
                                             <div className="flex items-center gap-1 flex-shrink-0">
-                                                <button
-                                                    onClick={() => handleConfirm(reg.id)}
-                                                    disabled={busy}
-                                                    className="flex items-center gap-1 px-2.5 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                                                >
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                    Xác nhận
-                                                </button>
-                                                <button
-                                                    onClick={() => setShowReject(showReject === reg.id ? null : reg.id)}
-                                                    disabled={busy}
-                                                    className="flex items-center gap-1 px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                                                >
-                                                    <XCircle className="w-3.5 h-3.5" />
-                                                    Từ chối
-                                                </button>
+                                                {reg.payment_proof_url && (
+                                                    <button
+                                                        onClick={() => setViewingBillUrl(reg.payment_proof_url)}
+                                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        title="Xem ảnh bill chuyển khoản"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                )}
+
+                                                {reg.payment_status === 'pending' && reg.payment_reference && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleConfirm(reg.id)}
+                                                            disabled={busy}
+                                                            className="flex items-center gap-1 px-2.5 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                                                        >
+                                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                                            Xác nhận
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setShowReject(showReject === reg.id ? null : reg.id)}
+                                                            disabled={busy}
+                                                            className="flex items-center gap-1 px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                                                        >
+                                                            <XCircle className="w-3.5 h-3.5" />
+                                                            Từ chối
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
+                                        )}
+
+                                        {/* Đang chờ member gửi mã chuyển khoản (chưa có cả mã lẫn ảnh bill) */}
+                                        {reg.payment_status === 'pending' && !reg.payment_reference && !reg.payment_proof_url && (
+                                            <span className="text-[11px] text-gray-400 italic flex-shrink-0 flex items-center gap-1">
+                                                <Hourglass className="w-3 h-3" />
+                                                Chờ CK
+                                            </span>
                                         )}
                                     </div>
 
@@ -298,6 +351,153 @@ export default function SessionDetailPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── Modal xem ảnh bill chuyển khoản ── */}
+            {viewingBillUrl && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                    onClick={() => setViewingBillUrl(null)}
+                >
+                    <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
+                        <button
+                            onClick={() => setViewingBillUrl(null)}
+                            className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
+                            title="Đóng"
+                        >
+                            <XCircle className="w-7 h-7" />
+                        </button>
+                        <img
+                            src={viewingBillUrl}
+                            alt="Ảnh bill chuyển khoản"
+                            className="w-full max-h-[80vh] object-contain rounded-xl bg-white"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* ── Add member modal ── */}
+            {showAddModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                    onClick={closeAddModal}
+                >
+                    <div
+                        className="bg-white rounded-2xl w-full max-w-md shadow-xl"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                            <h3 className="font-bold text-gray-900">Thêm thành viên vào buổi</h3>
+                            <button onClick={closeAddModal} className="p-1 text-gray-400 hover:text-gray-600">
+                                <XCircle className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            {!selectedMember ? (
+                                <>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input
+                                            autoFocus
+                                            value={search}
+                                            onChange={e => setSearch(e.target.value)}
+                                            className="input-field pl-9"
+                                            placeholder="Tìm theo tên hoặc số điện thoại..."
+                                        />
+                                    </div>
+                                    <div className="max-h-60 overflow-y-auto -mx-1">
+                                        {searching ? (
+                                            <p className="text-sm text-gray-400 text-center py-4">Đang tìm...</p>
+                                        ) : search.trim().length < 2 ? (
+                                            <p className="text-sm text-gray-400 text-center py-4">Nhập ít nhất 2 ký tự để tìm</p>
+                                        ) : searchResults.length === 0 ? (
+                                            <p className="text-sm text-gray-400 text-center py-4">Không tìm thấy thành viên</p>
+                                        ) : (
+                                            <ul className="space-y-1">
+                                                {searchResults.map(m => (
+                                                    <li key={m.id}>
+                                                        <button
+                                                            onClick={() => setSelectedMember(m)}
+                                                            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-left transition-colors"
+                                                        >
+                                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-700">
+                                                                {m.full_name?.[0]?.toUpperCase() ?? '?'}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
+                                                                <p className="text-xs text-gray-400">{m.phone}</p>
+                                                            </div>
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${m.member_type === 'co_dinh'
+                                                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                : 'bg-gray-50 text-gray-500 border-gray-200'
+                                                                }`}>
+                                                                {m.member_type === 'co_dinh' ? 'Thành viên' : 'Vãng lai'}
+                                                            </span>
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-3">
+                                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-blue-700">
+                                            {selectedMember.full_name?.[0]?.toUpperCase() ?? '?'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-gray-900 truncate">{selectedMember.full_name}</p>
+                                            <p className="text-xs text-gray-500">{selectedMember.phone}</p>
+                                        </div>
+                                        <button onClick={() => setSelectedMember(null)} className="text-xs text-blue-600 font-medium flex-shrink-0">
+                                            Đổi
+                                        </button>
+                                    </div>
+
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={addConfirmNow}
+                                            onChange={e => setAddConfirmNow(e.target.checked)}
+                                            className="w-4 h-4 rounded text-blue-600"
+                                        />
+                                        <span className="text-sm text-gray-700">Xác nhận thanh toán ngay (đã thu tiền tại sân)</span>
+                                    </label>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tuỳ chọn)</label>
+                                        <input
+                                            value={addNotes}
+                                            onChange={e => setAddNotes(e.target.value)}
+                                            className="input-field"
+                                            placeholder="VD: Khách vãng lai đăng ký trực tiếp"
+                                        />
+                                    </div>
+
+                                    {!addConfirmNow && (
+                                        <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                                            ⓘ Hệ thống sẽ gửi thông báo yêu cầu thanh toán đến thành viên này.
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100">
+                            <button onClick={closeAddModal} className="btn-secondary text-sm">Hủy</button>
+                            <button
+                                onClick={handleAddMember}
+                                disabled={!selectedMember || adding}
+                                className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {adding && <Loader2 className="w-4 h-4 animate-spin" />}
+                                Thêm vào buổi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

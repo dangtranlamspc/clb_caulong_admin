@@ -75,11 +75,7 @@ function WinRatePodium({ top3 }: { top3: any[] }) {
                                 className={`${style.avatarSize} rounded-full overflow-hidden flex items-center justify-center font-bold shadow-inner border ${s.border} ${s.avatarBg} ${s.avatarText}`}
                             >
                                 {p.avatar_url ? (
-                                    <img
-                                        src={p.avatar_url}
-                                        alt={p.full_name}
-                                        className="w-full h-full object-cover"
-                                    />
+                                    <img src={p.avatar_url} alt={p.full_name} className="w-full h-full object-cover" />
                                 ) : (
                                     p.full_name?.[0]?.toUpperCase()
                                 )}
@@ -99,29 +95,27 @@ function WinRatePodium({ top3 }: { top3: any[] }) {
     );
 }
 
-function WinRateList({ data }: { data: any[] }) {
+// startPos: vị trí bắt đầu đếm (mặc định 4 vì top3 đã ở podium)
+function WinRateList({ data, startPos = 4 }: { data: any[]; startPos?: number }) {
     return (
         <div className="card !p-0 overflow-hidden">
             <div className="divide-y divide-gray-100">
                 {data.map((member, idx) => {
-                    const isTop3 = idx < 3;
-                    const s = TOP3_STYLES[idx];
+                    const pos = startPos + idx;
+                    const isTop3 = pos <= 3;
+                    const s = TOP3_STYLES[pos - 1];
                     const winRate = Number(member.win_rate_percent);
                     return (
-                        <div key={member.id} className={`flex items-center gap-3 px-4 py-3 ${isTop3 ? s.bg : 'hover:bg-gray-50'}`}>
-                            <PositionBadge pos={idx + 1} />
+                        <div key={member.id} className={`flex items-center gap-3 px-4 py-3 ${isTop3 && s ? s.bg : 'hover:bg-gray-50'}`}>
+                            <PositionBadge pos={pos} />
                             <div
-                                className={`w-9 h-9 rounded-full overflow-hidden flex items-center justify-center font-semibold text-sm flex-shrink-0 ${isTop3
+                                className={`w-9 h-9 rounded-full overflow-hidden flex items-center justify-center font-semibold text-sm flex-shrink-0 ${isTop3 && s
                                     ? `${s.avatarBg} ${s.avatarText}`
                                     : 'bg-green-100 text-green-700'
                                     }`}
                             >
                                 {member.avatar_url ? (
-                                    <img
-                                        src={member.avatar_url}
-                                        alt={member.full_name}
-                                        className="w-full h-full object-cover"
-                                    />
+                                    <img src={member.avatar_url} alt={member.full_name} className="w-full h-full object-cover" />
                                 ) : (
                                     member.full_name?.[0]?.toUpperCase()
                                 )}
@@ -149,7 +143,6 @@ function WinRateList({ data }: { data: any[] }) {
     );
 }
 
-
 function TierBadge({ tier, division, points }: { tier: string; division: string; points: number }) {
     const cfg = getTierConfig(tier);
     return (
@@ -173,18 +166,8 @@ function RankPodium({ top3 }: { top3: any[] }) {
                 const cfg = getTierConfig(p.tier);
                 const s = TOP3_STYLES[positions[i] - 1];
                 return (
-                    <div
-                        key={p.id}
-                        className={`flex flex-col items-center ${podiumPt[i]}`}
-                        style={{ overflow: 'visible' }}
-                    >
-                        <div
-                            className="relative flex items-center justify-center pb-20"
-                            style={{
-                                height: iconSizes[i],
-                                overflow: 'visible',
-                            }}
-                        >
+                    <div key={p.id} className={`flex flex-col items-center ${podiumPt[i]}`} style={{ overflow: 'visible' }}>
+                        <div className="relative flex items-center justify-center pb-20" style={{ height: iconSizes[i], overflow: 'visible' }}>
                             <RankPodiumAvatar
                                 tier={p.tier}
                                 avatar={p.avatar_url}
@@ -192,11 +175,8 @@ function RankPodium({ top3 }: { top3: any[] }) {
                                 size={iconSizes[i]}
                                 frameScale={i === 1 ? 3 : 2.7}
                             />
-
                             {crowns[i] && (
-                                <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-2xl">
-                                    👑
-                                </div>
+                                <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-2xl">👑</div>
                             )}
                         </div>
                         <div className="text-center">
@@ -210,12 +190,12 @@ function RankPodium({ top3 }: { top3: any[] }) {
         </div>
     );
 }
-{/* <RankAvatar tier={p.tier} name={p.full_name} size={iconSizes[i]} /> */ }
-function RankList({ data }: { data: any[] }) {
+
+function RankList({ data, startPos = 4 }: { data: any[]; startPos?: number }) {
     return (
         <div className="card !p-0 overflow-hidden">
             <div className="divide-y divide-gray-100">
-                {data.map((p) => {
+                {data.map((p, idx) => {
                     const pos = Number(p.rank_position);
                     const isTop3 = pos <= 3;
                     const s = TOP3_STYLES[pos - 1];
@@ -224,11 +204,10 @@ function RankList({ data }: { data: any[] }) {
                     return (
                         <div
                             key={p.id}
-                            className={`flex items-center gap-3 px-4 py-4 ${isTop3 ? s?.bg : 'hover:bg-gray-50'}`}
+                            className={`flex items-center gap-3 px-4 py-4 ${isTop3 && s ? s.bg : 'hover:bg-gray-50'}`}
                             style={{ minHeight: 64 }}
                         >
                             <PositionBadge pos={pos} />
-
                             <RankPodiumAvatarList
                                 tier={p.tier}
                                 avatar={p.avatar_url}
@@ -237,15 +216,12 @@ function RankList({ data }: { data: any[] }) {
                                 frameScale={3.2}
                                 listMode
                             />
-
                             <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-800 truncate">{p.full_name}</p>
                                 <div className="flex items-center gap-2 mt-0.5">
                                     <TierBadge tier={p.tier} division={p.division} points={p.points} />
                                 </div>
                             </div>
-
-                            {/* Right: RankIcon + W/L */}
                             <div className="flex items-center gap-2 flex-shrink-0">
                                 <div className="text-right space-y-0.5">
                                     <p className="text-xs text-gray-400">
@@ -261,7 +237,7 @@ function RankList({ data }: { data: any[] }) {
                     );
                 })}
             </div>
-        </div >
+        </div>
     );
 }
 
@@ -293,7 +269,6 @@ export default function RankingsPage() {
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
-            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -314,7 +289,6 @@ export default function RankingsPage() {
                 </button>
             </div>
 
-            {/* Tabs */}
             <div className="flex border border-gray-200 rounded-xl bg-gray-50 p-1 gap-1">
                 <button
                     onClick={() => setTab('winrate')}
@@ -330,7 +304,6 @@ export default function RankingsPage() {
                 </button>
             </div>
 
-            {/* Content */}
             {loading ? (
                 <div className="space-y-3">
                     {[...Array(8)].map((_, i) => <div key={i} className="card h-16 animate-pulse bg-gray-100" />)}
@@ -343,12 +316,9 @@ export default function RankingsPage() {
                     </div>
                 ) : (
                     <>
-                        {top3WR.length >= 1 && (
-                            <WinRatePodium top3={top3WR} />
-                        )}
-
+                        {top3WR.length >= 1 && <WinRatePodium top3={top3WR} />}
                         {winRateData.length > 3 && (
-                            <WinRateList data={winRateData.slice(3)} />
+                            <WinRateList data={winRateData.slice(3)} startPos={4} />
                         )}
                     </>
                 )
@@ -361,7 +331,7 @@ export default function RankingsPage() {
                 ) : (
                     <>
                         {top3Rank.length >= 1 && <RankPodium top3={top3Rank} />}
-                        {rankData.length > 3 && <RankList data={rankData.slice(3)} />}
+                        {rankData.length > 3 && <RankList data={rankData.slice(3)} startPos={4} />}
                     </>
                 )
             )}

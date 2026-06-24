@@ -59,6 +59,7 @@ export const usersApi = {
   delete: (id: string) => api.delete(`/users/${id}`),
   dashboard: () => api.get('/users/dashboard'),
   export: (params?: any) => api.get('/users/export', { params, responseType: 'blob' }),
+  searchMembers: (q: string) => api.get('/users/search/members', { params: { q } }),
 };
 
 export const sessionsApi = {
@@ -77,6 +78,7 @@ export const registrationsApi = {
   confirm: (id: string, notes?: string) => api.patch(`/registrations/${id}/confirm`, { notes }),
   reject: (id: string, notes?: string) => api.patch(`/registrations/${id}/reject`, { notes }),
   setAmount: (id: string, amount: number) => api.patch(`/registrations/${id}/amount`, { amount }),
+  adminAdd: (data: any) => api.post('/registrations/admin-add', data),
 };
 
 export const matchesApi = {
