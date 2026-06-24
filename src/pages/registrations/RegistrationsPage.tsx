@@ -93,8 +93,8 @@ export default function RegistrationsPage() {
                         key={value}
                         onClick={() => setTab(value)}
                         className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === value
-                                ? 'border-blue-600 text-blue-700'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                            ? 'border-blue-600 text-blue-700'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                     >
                         <Icon className={`w-4 h-4 ${activeTab === value ? 'text-blue-600' : cls}`} />
@@ -128,8 +128,24 @@ export default function RegistrationsPage() {
                             <div key={reg.id} className="card">
                                 <div className="flex items-start gap-3">
                                     {/* Avatar */}
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                        <span className="text-blue-700 font-semibold text-sm">
+                                    <div className="w-10 h-10 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center flex-shrink-0 border border-gray-200">
+                                        {user?.avatar_url ? (
+                                            <img
+                                                src={user.avatar_url}
+                                                alt={user.full_name}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                                    if (fallback) fallback.style.display = 'flex';
+                                                }}
+                                            />
+                                        ) : null}
+
+                                        <span
+                                            style={{ display: user?.avatar_url ? 'none' : 'flex' }}
+                                            className="w-full h-full items-center justify-center text-blue-700 font-semibold text-sm"
+                                        >
                                             {user?.full_name?.[0]?.toUpperCase() ?? '?'}
                                         </span>
                                     </div>

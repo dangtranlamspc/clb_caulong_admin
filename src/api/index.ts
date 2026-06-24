@@ -95,12 +95,10 @@ export const matchesApi = {
 };
 
 export const rankingsApi = {
-
   leaderboard: () => api.get('/rankings/leaderboard'),
   reviceLeaderboard: () => api.get('/rankings/revice'),
   winRate: () => api.get('/rankings/win-rate'),
   myStats: () => api.get('/rankings/my-stats'),
-
   rankLeaderboard: () => api.get('/rankings/rank-leaderboard'),
   myRank: () => api.get('/rankings/my-rank'),
   rankHistory: (limit?: number) => api.get('/rankings/rank-history', { params: { limit } }),

@@ -2,14 +2,70 @@ import { useEffect, useState } from 'react';
 import { Trophy, Medal, Star, RefreshCw } from 'lucide-react';
 import { rankingsApi } from '../../api';
 
-const LEVEL_CONFIG: Record<string, { cls: string; emoji: string }> = {
-    'Cố định (tháng)': { cls: 'bg-purple-100 text-purple-800 border-purple-300', emoji: '🏆' },
-    'Vãng lai cố định': { cls: 'bg-blue-100 text-blue-800 border-blue-300', emoji: '🥇' },
-    'Vãng lai lâu lâu': { cls: 'bg-cyan-100 text-cyan-800 border-cyan-300', emoji: '🥈' },
-    'Vãng lai lần đầu': { cls: 'bg-green-100 text-green-800 border-green-300', emoji: '🥉' },
-    'Chưa có level': { cls: 'bg-gray-100 text-gray-500 border-gray-200', emoji: '—' },
+// Nhãn trình độ (khớp levelMap trong users.service.ts) 
+const LEVEL_LABELS: Record<string, string> = {
+    yeu: 'Yếu',
+    tb_yeu: 'TB yếu',
+    tb: 'TB',
+    tb_plus: 'TB+',
+    ban_chuyen: 'Bán chuyên (BC)',
+    chuyen_nghiep: 'Chuyên nghiệp',
 };
 
+// Ngưỡng phân loại vãng lai: >= 5 buổi đăng ký (đã xác nhận) -> Khách quen
+const VANG_LAI_THRESHOLD = 5;
+
+interface LeaderboardMember {
+    id: string;
+    rank: number;
+    full_name: string;
+    avatar_url?: string | null;
+    total_points: number;
+    total_sessions: number;
+    member_type?: 'co_dinh' | 'vang_lai';
+    member_subtype?: 'thuong' | 'vip';
+    level?: string;
+    attendance_count?: number;
+}
+
+interface MemberBadge {
+    label: string;
+    cls: string;
+    emoji: string;
+}
+
+/** Tính badge hiển thị: Thành viên -> trình độ + Thường/VIP, Vãng lai -> Khách mới/Khách quen */
+function getMemberBadge(member: LeaderboardMember): MemberBadge | null {
+    if (member.member_type === 'co_dinh') {
+        const isVip = member.member_subtype === 'vip';
+        const levelLabel = member.level ? LEVEL_LABELS[member.level] : undefined;
+        const subtypeLabel = isVip ? 'VIP' : 'Thường';
+        const label = levelLabel ? `${subtypeLabel} • ${levelLabel}` : subtypeLabel;
+
+        return {
+            label,
+            cls: isVip
+                ? 'bg-purple-100 text-purple-800 border-purple-300'
+                : 'bg-blue-100 text-blue-800 border-blue-300',
+            emoji: isVip ? '👑' : '🏆',
+        };
+    }
+
+    if (member.member_type === 'vang_lai') {
+        const count = member.attendance_count ?? member.total_sessions ?? 0;
+        const isKhachQuen = count >= VANG_LAI_THRESHOLD;
+
+        return {
+            label: isKhachQuen ? 'Khách quen' : 'Khách mới',
+            cls: isKhachQuen
+                ? 'bg-cyan-100 text-cyan-800 border-cyan-300'
+                : 'bg-green-100 text-green-800 border-green-300',
+            emoji: isKhachQuen ? '🥈' : '🥉',
+        };
+    }
+
+    return null;
+}
 
 function Shuttlecock({ size = 20 }: { size?: number }) {
     return (
@@ -49,8 +105,40 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
+function Avatar({
+    src,
+    name,
+    size = 40,
+}: {
+    src?: string | null;
+    name: string;
+    size?: number;
+}) {
+    const [imageError, setImageError] = useState(false);
+
+    const showImage = src && !imageError;
+
+    return (
+        <div
+            className="rounded-full overflow-hidden border border-gray-200 flex items-center justify-center bg-blue-100 text-blue-700 font-semibold"
+            style={{ width: size, height: size }}
+        >
+            {showImage ? (
+                <img
+                    src={src}
+                    alt={name}
+                    className="w-full h-full object-cover"
+                    onError={() => setImageError(true)}
+                />
+            ) : (
+                <span>{name?.[0]?.toUpperCase()}</span>
+            )}
+        </div>
+    );
+}
+
 export default function LeaderboardPage() {
-    const [data, setData] = useState<any[]>([]);
+    const [data, setData] = useState<LeaderboardMember[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
@@ -78,7 +166,7 @@ export default function LeaderboardPage() {
                         Bảng xếp hạng
                     </h1>
                     <p className="text-gray-500 text-sm mt-0.5">
-                        Tính theo số cầu lông tích lũy (mỗi buổi thanh toán xác nhận = +1 🏸)
+                        Tính theo số cầu lông tích lũy (mỗi buổi thanh toán xác nhận = +1 <Shuttlecock size={24} />)
                     </p>
                 </div>
                 <button
@@ -110,8 +198,12 @@ export default function LeaderboardPage() {
                             <div className="flex flex-col items-center gap-2 pt-4">
                                 {top3[1] ? (
                                     <>
-                                        <div className="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center text-2xl font-bold text-slate-600 shadow-inner">
-                                            {top3[1].full_name?.[0]}
+                                        <div className="w-14 h-14 rounded-full overflow-hidden shadow-inner border">
+                                            <Avatar
+                                                src={top3[1].avatar_url}
+                                                name={top3[1].full_name}
+                                                size={56}
+                                            />
                                         </div>
                                         <div className="text-center">
                                             <p className="text-sm font-semibold text-gray-800 truncate max-w-[90px]">{top3[1].full_name}</p>
@@ -127,8 +219,12 @@ export default function LeaderboardPage() {
                                 {top3[0] && (
                                     <>
                                         <div className="relative">
-                                            <div className="w-18 h-18 w-[72px] h-[72px] rounded-full bg-yellow-100 flex items-center justify-center text-3xl font-bold text-yellow-700 shadow-lg border-2 border-yellow-400">
-                                                {top3[0].full_name?.[0]}
+                                            <div className="w-[72px] h-[72px] rounded-full overflow-hidden shadow-lg border-2 border-yellow-400">
+                                                <Avatar
+                                                    src={top3[0].avatar_url}
+                                                    name={top3[0].full_name}
+                                                    size={72}
+                                                />
                                             </div>
                                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">👑</div>
                                         </div>
@@ -145,8 +241,12 @@ export default function LeaderboardPage() {
                             <div className="flex flex-col items-center gap-2 pt-6">
                                 {top3[2] ? (
                                     <>
-                                        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-xl font-bold text-amber-700 shadow-inner">
-                                            {top3[2].full_name?.[0]}
+                                        <div className="w-12 h-12 rounded-full overflow-hidden shadow-inner border">
+                                            <Avatar
+                                                src={top3[2].avatar_url}
+                                                name={top3[2].full_name}
+                                                size={48}
+                                            />
                                         </div>
                                         <div className="text-center">
                                             <p className="text-sm font-semibold text-gray-800 truncate max-w-[90px]">{top3[2].full_name}</p>
@@ -163,7 +263,7 @@ export default function LeaderboardPage() {
                     <div className="card !p-0 overflow-hidden">
                         <div className="divide-y divide-gray-100">
                             {data.map((member) => {
-                                const levelCfg = LEVEL_CONFIG[member.level] ?? LEVEL_CONFIG['Chưa có level'];
+                                const badge = getMemberBadge(member);
                                 const isTop3 = member.rank <= 3;
 
                                 return (
@@ -174,19 +274,22 @@ export default function LeaderboardPage() {
                                         <RankBadge rank={Number(member.rank)} />
 
                                         {/* Avatar */}
-                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 ${isTop3 ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-700'
-                                            }`}>
-                                            {member.full_name?.[0]?.toUpperCase()}
+                                        <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
+                                            <Avatar
+                                                src={member.avatar_url}
+                                                name={member.full_name}
+                                                size={36}
+                                            />
                                         </div>
 
-                                        {/* Name + level */}
+                                        {/* Name + level/khách */}
                                         <div className="flex-1 min-w-0">
                                             <p className={`font-medium truncate ${isTop3 ? 'text-gray-900' : 'text-gray-800'}`}>
                                                 {member.full_name}
                                             </p>
-                                            {member.level && member.level !== 'Chưa có level' && (
-                                                <span className={`text-xs px-2 py-0.5 rounded-full border inline-block mt-0.5 ${levelCfg.cls}`}>
-                                                    {levelCfg.emoji} {member.level}
+                                            {badge && (
+                                                <span className={`text-xs px-2 py-0.5 rounded-full border inline-block mt-0.5 ${badge.cls}`}>
+                                                    {badge.emoji} {badge.label}
                                                 </span>
                                             )}
                                         </div>

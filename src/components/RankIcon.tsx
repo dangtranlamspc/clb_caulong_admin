@@ -16,7 +16,6 @@ interface RankAvatarProps {
 
 export function RankIcon({ tier, size = 48 }: RankIconProps) {
     const cfg = getTierConfig(tier);
-    // return <img src={cfg.img} width={size} height={size} style={{ objectFit: 'contain' }} />;
     return <img src={cfg.img_old} width={size} height={size} style={{ objectFit: 'contain' }} />;
 }
 

@@ -29,6 +29,28 @@ const LEVEL_OPTIONS = [
   { value: 'chuyen_nghiep', label: 'Chuyên nghiệp' },
 ];
 
+function Avatar({ user, sizeClass = 'w-10 h-10 text-sm' }: { user: any; sizeClass?: string }) {
+  const [imgError, setImgError] = useState(false);
+  const initial = user.full_name?.[0]?.toUpperCase() ?? '?';
+
+  if (user.avatar_url && !imgError) {
+    return (
+      <img
+        src={user.avatar_url}
+        alt={user.full_name}
+        className={`rounded-full object-cover flex-shrink-0 ${sizeClass}`}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className={`rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0 ${sizeClass}`}>
+      {initial}
+    </div>
+  );
+}
+
 function MemberTypeBadge({ user }: { user: any }) {
   if (user.member_type === 'co_dinh') {
     const isVip = user.member_subtype === 'vip';
@@ -58,6 +80,55 @@ function MemberTypeBadge({ user }: { user: any }) {
           <span className="opacity-60"> · {user.attendance_count}</span>
         )}
       </span>
+    </div>
+  );
+}
+
+function RowActions({
+  user,
+  actionLoading,
+  onToggleActive,
+  onDelete,
+  size = 'normal',
+}: {
+  user: any;
+  actionLoading: string | null;
+  onToggleActive: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
+  size?: 'normal' | 'compact';
+}) {
+  const btnPad = size === 'compact' ? 'p-2' : 'p-1.5';
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Link
+        to={`/members/${user.id}`}
+        className={`${btnPad} text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors`}
+        title="Xem / Sửa"
+      >
+        <Eye className="w-4 h-4" />
+      </Link>
+      <button
+        onClick={() => onToggleActive(user.id)}
+        disabled={actionLoading === user.id}
+        className={`${btnPad} rounded-lg transition-colors ${user.is_active
+          ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+          : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+          }`}
+        title={user.is_active ? 'Vô hiệu hóa' : 'Kích hoạt'}
+      >
+        {user.is_active
+          ? <ToggleRight className="w-4 h-4" />
+          : <ToggleLeft className="w-4 h-4" />
+        }
+      </button>
+      <button
+        onClick={() => onDelete(user.id, user.full_name)}
+        disabled={actionLoading === user.id}
+        className={`${btnPad} text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors`}
+        title="Xóa"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
     </div>
   );
 }
@@ -238,9 +309,75 @@ export default function MembersPage() {
         )}
       </div>
 
-      {/* Table */}
+      {/* List container — card list trên mobile, table trên desktop (md+) */}
       <div className="card !p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+
+        {/* ─── Mobile: card list (< md) ─────────────────────────────── */}
+        <div className="md:hidden bg-gray-50 p-3 space-y-3">
+          {loading ? (
+            [...Array(6)].map((_, i) => (
+              <div key={i} className="p-4 space-y-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-100 animate-pulse flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-100 rounded animate-pulse w-2/3" />
+                    <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : users.length === 0 ? (
+            <div className="px-4 py-12 text-center text-gray-400 bg-white rounded-xl border border-gray-100">
+              Không tìm thấy dữ liệu
+            </div>
+          ) : users.map((user) => (
+            <div key={user.id} className="p-4 space-y-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+              {/* Avatar + tên + email/sđt + trạng thái */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar user={user} sizeClass="w-10 h-10 text-sm" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 truncate">{user.full_name}</p>
+                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                    {user.phone && <p className="text-xs text-gray-400">{user.phone}</p>}
+                  </div>
+                </div>
+                <span className={`flex-shrink-0 ${user.is_active ? 'badge-active' : 'badge-inactive'}`}>
+                  {user.is_active ? 'Hoạt động' : 'Vô hiệu'}
+                </span>
+              </div>
+
+              {/* Vai trò + trình độ + phân cấp */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={user.role === 'admin' ? 'badge-admin' : 'badge-member'}>
+                    {user.role === 'admin' ? 'Admin' : 'Thành viên'}
+                  </span>
+                  {user.level ? (
+                    <span className="px-2 py-0.5 bg-violet-50 text-violet-700 rounded text-xs font-medium">
+                      {LEVEL_LABEL[user.level] ?? user.level}
+                    </span>
+                  ) : null}
+                </div>
+                <MemberTypeBadge user={user} />
+              </div>
+
+              {/* Thao tác */}
+              <div className="pt-2 border-t border-gray-100">
+                <RowActions
+                  user={user}
+                  actionLoading={actionLoading}
+                  onToggleActive={handleToggleActive}
+                  onDelete={handleDelete}
+                  size="compact"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ─── Desktop: table (md+) ─────────────────────────────────── */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -274,9 +411,12 @@ export default function MembersPage() {
               ) : users.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
-                    <div>
-                      <p className="font-medium text-gray-900">{user.full_name}</p>
-                      <p className="text-xs text-gray-400 md:hidden">{user.email}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar user={user} sizeClass="w-9 h-9 text-sm" />
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{user.full_name}</p>
+                        <p className="text-xs text-gray-400 md:hidden truncate">{user.email}</p>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{user.email}</td>
@@ -304,37 +444,12 @@ export default function MembersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        to={`/members/${user.id}`}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Xem / Sửa"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Link>
-                      <button
-                        onClick={() => handleToggleActive(user.id)}
-                        disabled={actionLoading === user.id}
-                        className={`p-1.5 rounded-lg transition-colors ${user.is_active
-                          ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-                          : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                          }`}
-                        title={user.is_active ? 'Vô hiệu hóa' : 'Kích hoạt'}
-                      >
-                        {user.is_active
-                          ? <ToggleRight className="w-4 h-4" />
-                          : <ToggleLeft className="w-4 h-4" />
-                        }
-                      </button>
-                      <button
-                        onClick={() => handleDelete(user.id, user.full_name)}
-                        disabled={actionLoading === user.id}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Xóa"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <RowActions
+                      user={user}
+                      actionLoading={actionLoading}
+                      onToggleActive={handleToggleActive}
+                      onDelete={handleDelete}
+                    />
                   </td>
                 </tr>
               ))}
@@ -342,7 +457,7 @@ export default function MembersPage() {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* Pagination — chung cho cả mobile & desktop */}
         {meta.total_pages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
             <p className="text-sm text-gray-500">

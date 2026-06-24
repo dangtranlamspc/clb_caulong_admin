@@ -16,6 +16,40 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> =
     rejected: { label: 'Từ chối', cls: 'bg-red-50 text-red-600 border-red-200', icon: XCircle },
 };
 
+function UserAvatar({
+    avatarUrl,
+    fullName,
+    size = 36,
+}: {
+    avatarUrl?: string | null;
+    fullName?: string;
+    size?: number;
+}) {
+    const [error, setError] = useState(false);
+
+    const showImage = avatarUrl && !error;
+
+    return (
+        <div
+            className="rounded-full overflow-hidden bg-blue-100 flex items-center justify-center flex-shrink-0"
+            style={{ width: size, height: size }}
+        >
+            {showImage ? (
+                <img
+                    src={avatarUrl}
+                    alt={fullName}
+                    className="w-full h-full object-cover"
+                    onError={() => setError(true)}
+                />
+            ) : (
+                <span className="text-blue-700 text-sm font-semibold">
+                    {fullName?.[0]?.toUpperCase() ?? '?'}
+                </span>
+            )}
+        </div>
+    );
+}
+
 export default function SessionDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -166,9 +200,11 @@ export default function SessionDetailPage() {
                                     <div className="flex items-start gap-3">
                                         {/* Avatar */}
                                         <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                            <span className="text-blue-700 text-sm font-semibold">
-                                                {user?.full_name?.[0]?.toUpperCase() ?? '?'}
-                                            </span>
+                                            <UserAvatar
+                                                avatarUrl={user?.avatar_url}
+                                                fullName={user?.full_name}
+                                                size={36}
+                                            />
                                         </div>
 
                                         {/* Info */}
@@ -178,8 +214,8 @@ export default function SessionDetailPage() {
                                                 {/* member_type badge */}
                                                 {user?.member_type && (
                                                     <span className={`text-xs px-2 py-0.5 rounded-full border ${user.member_type === 'co_dinh'
-                                                            ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                            : 'bg-gray-50 text-gray-500 border-gray-200'
+                                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                        : 'bg-gray-50 text-gray-500 border-gray-200'
                                                         }`}>
                                                         {user.member_type === 'co_dinh' ? '🔵 Cố định' : '⚪ Vãng lai'}
                                                     </span>

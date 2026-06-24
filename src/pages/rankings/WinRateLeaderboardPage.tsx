@@ -71,8 +71,18 @@ function WinRatePodium({ top3 }: { top3: any[] }) {
                 return (
                     <div key={p.id} className={`flex flex-col items-center gap-2 ${style.pt}`}>
                         <div className="relative">
-                            <div className={`${style.avatarSize} rounded-full ${s.avatarBg} ${s.avatarText} flex items-center justify-center font-bold shadow-inner border ${s.border}`}>
-                                {p.full_name?.[0]}
+                            <div
+                                className={`${style.avatarSize} rounded-full overflow-hidden flex items-center justify-center font-bold shadow-inner border ${s.border} ${s.avatarBg} ${s.avatarText}`}
+                            >
+                                {p.avatar_url ? (
+                                    <img
+                                        src={p.avatar_url}
+                                        alt={p.full_name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    p.full_name?.[0]?.toUpperCase()
+                                )}
                             </div>
                             {style.crown && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">👑</div>}
                         </div>
@@ -100,8 +110,21 @@ function WinRateList({ data }: { data: any[] }) {
                     return (
                         <div key={member.id} className={`flex items-center gap-3 px-4 py-3 ${isTop3 ? s.bg : 'hover:bg-gray-50'}`}>
                             <PositionBadge pos={idx + 1} />
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 ${isTop3 ? `${s.avatarBg} ${s.avatarText}` : 'bg-green-100 text-green-700'}`}>
-                                {member.full_name?.[0]?.toUpperCase()}
+                            <div
+                                className={`w-9 h-9 rounded-full overflow-hidden flex items-center justify-center font-semibold text-sm flex-shrink-0 ${isTop3
+                                    ? `${s.avatarBg} ${s.avatarText}`
+                                    : 'bg-green-100 text-green-700'
+                                    }`}
+                            >
+                                {member.avatar_url ? (
+                                    <img
+                                        src={member.avatar_url}
+                                        alt={member.full_name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    member.full_name?.[0]?.toUpperCase()
+                                )}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-800 truncate">{member.full_name}</p>
@@ -320,8 +343,13 @@ export default function RankingsPage() {
                     </div>
                 ) : (
                     <>
-                        {top3WR.length >= 1 && <WinRatePodium top3={top3WR} />}
-                        <WinRateList data={winRateData} />
+                        {top3WR.length >= 1 && (
+                            <WinRatePodium top3={top3WR} />
+                        )}
+
+                        {winRateData.length > 3 && (
+                            <WinRateList data={winRateData.slice(3)} />
+                        )}
                     </>
                 )
             ) : (
