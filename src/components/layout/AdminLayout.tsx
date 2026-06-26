@@ -13,12 +13,12 @@ const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Thành viên', path: '/members', icon: Users },
   { label: 'Buổi đánh cầu', path: '/sessions', icon: CalendarDays },
-  // { label: 'Xác nhận TT', path: '/registrations', icon: ClipboardCheck },
+  { label: 'Xác nhận TT', path: '/registrations', icon: ClipboardCheck },
   { label: 'Trận giao hữu', path: '/matches', icon: Swords },
   { label: 'Bảng xếp hạng level', path: '/leaderboard', icon: Trophy },
   { label: 'Rank', path: '/rankings/win-rate', icon: TrendingUp },
-  // { label: 'Báo cáo', path: '/reports', icon: TrendingUp },
-  // { label: 'Báo cáo guest', path: '/sessions/guest', icon: TrendingUp },
+  { label: 'Báo cáo', path: '/reports', icon: TrendingUp },
+  { label: 'Báo cáo guest', path: '/sessions/guest', icon: TrendingUp },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
