@@ -71,6 +71,7 @@ export const sessionsApi = {
   delete: (id: string) => api.delete(`/sessions/${id}`),
   getRegistrations: (id: string) => api.get(`/sessions/${id}/registrations`),
   getCost: (id: string) => api.get(`/sessions/${id}/cost`),
+  finish: (id: string, data: any) => api.patch(`/sessions/${id}/finish`, data),
 };
 
 export const registrationsApi = {
@@ -79,6 +80,9 @@ export const registrationsApi = {
   reject: (id: string, notes?: string) => api.patch(`/registrations/${id}/reject`, { notes }),
   setAmount: (id: string, amount: number) => api.patch(`/registrations/${id}/amount`, { amount }),
   adminAdd: (data: any) => api.post('/registrations/admin-add', data),
+  addGuest: (id: string, data: any) => api.post(`/registrations/${id}/guests`, data),
+  checkinPresent: (id: string) => api.patch(`/registrations/${id}/checkin-present`),
+  checkinAbsent: (id: string) => api.patch(`/registrations/${id}/checkin-absent`),
 };
 
 export const matchesApi = {
@@ -105,13 +109,4 @@ export const rankingsApi = {
   myRank: () => api.get('/rankings/my-rank'),
   rankHistory: (limit?: number) => api.get('/rankings/rank-history', { params: { limit } }),
   lpChart: (limit?: number) => api.get('/rankings/lp-chart', { params: { limit } }),
-};
-
-export const guestsApi = {
-  create: (data: any) => api.post('/session-guests', data),
-  list: (params?: any) => api.get('/session-guests', { params }),
-  update: (id: string, data: any) => api.patch(`/session-guests/${id}`, data),
-  remove: (id: string) => api.delete(`/session-guests/${id}`),
-  costReport: (params?: any) => api.get('/cost-report', { params }),
-  costReportSummary: () => api.get('/cost-report/summary'),
 };

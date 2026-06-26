@@ -33,10 +33,6 @@ export default function SessionFormPage() {
             duration_minutes: 90,
             location: '',
             max_slots: 20,
-            price_per_slot: null as number | null,
-            price_male: 100000,
-            price_female: 80000,
-            // Chi phí buổi (chỉ dùng khi completed)
             court_fee: 0,
             shuttle_count: 0,
             shuttle_price: 0,
@@ -54,9 +50,6 @@ export default function SessionFormPage() {
                     duration_minutes: data.duration_minutes,
                     location: data.location ?? '',
                     max_slots: data.max_slots,
-                    price_per_slot: data.price_per_slot,
-                    price_male: data.price_male ?? 100000,
-                    price_female: data.price_female ?? 80000,
                     court_fee: data.court_fee ?? 0,
                     shuttle_count: data.shuttle_count ?? 0,
                     shuttle_price: data.shuttle_price ?? 0,
@@ -65,7 +58,6 @@ export default function SessionFormPage() {
         }
     }, [id]);
 
-    // Watch chi phí để preview real-time
     const courtFee = Number(watch('court_fee')) || 0;
     const shuttleCount = Number(watch('shuttle_count')) || 0;
     const shuttlePrice = Number(watch('shuttle_price')) || 0;
@@ -82,9 +74,6 @@ export default function SessionFormPage() {
                 duration_minutes: Number(values.duration_minutes),
                 location: values.location || undefined,
                 max_slots: Number(values.max_slots),
-                price_per_slot: Number(values.price_per_slot),
-                price_male: values.price_male ? Number(values.price_male) : null,
-                price_female: values.price_female ? Number(values.price_female) : null,
             };
 
             // Chỉ gửi chi phí khi là buổi đã hoàn thành
@@ -103,7 +92,6 @@ export default function SessionFormPage() {
             }
             navigate(`/sessions/${id ?? ''}`);
         } catch {
-            // axios interceptor handles error toast
         } finally {
             setLoading(false);
         }
@@ -189,27 +177,13 @@ export default function SessionFormPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Giá vãng lai (VNĐ)</label>
-                        <div className="grid grid-cols-3 gap-3">
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-1">Mặc định</label>
-                                <input {...register('price_per_slot', { min: 0 })} type="number" step="1000" className="input-field" />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-blue-600 mb-1">👨 Nam</label>
-                                <input {...register('price_male')} type="number" step="1000" className="input-field" />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-pink-600 mb-1">👩 Nữ</label>
-                                <input {...register('price_female')} type="number" step="1000" className="input-field" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Địa điểm</label>
                         <input {...register('location')} className="input-field" placeholder="Sân ABC - 123 Nguyễn Huệ" />
                     </div>
+
+                    <p className="text-xs text-gray-400 italic">
+                        ℹ️ Giá tiền từng người sẽ được nhập riêng lúc "Kết thúc buổi"
+                    </p>
                 </div>
 
                 {/* ── Chi phí thực tế — chỉ hiện khi buổi đã completed ── */}
@@ -220,7 +194,6 @@ export default function SessionFormPage() {
                             <p className="text-sm font-semibold text-blue-700">Chi phí thực tế buổi</p>
                         </div>
 
-                        {/* Tiền sân */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">🏟 Tiền sân (VNĐ)</label>
                             <input
@@ -232,7 +205,6 @@ export default function SessionFormPage() {
                             />
                         </div>
 
-                        {/* Số cầu × giá cầu */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">🏸 Cầu lông</label>
                             <div className="grid grid-cols-2 gap-3">
@@ -258,7 +230,6 @@ export default function SessionFormPage() {
                             </div>
                         </div>
 
-                        {/* Preview tổng chi phí real-time */}
                         {totalCost > 0 && (
                             <div className="rounded-lg bg-white border border-blue-200 p-3 space-y-1.5 text-sm">
                                 <div className="flex justify-between text-gray-600">
@@ -275,9 +246,6 @@ export default function SessionFormPage() {
                                     <span>Tổng chi phí</span>
                                     <span>{fmt(totalCost)}</span>
                                 </div>
-                                <p className="text-xs text-blue-500 mt-1">
-                                    Lưu để cập nhật bảng tính phân bổ vãng lai / cố định
-                                </p>
                             </div>
                         )}
                     </div>

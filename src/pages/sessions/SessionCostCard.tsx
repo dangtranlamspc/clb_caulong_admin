@@ -23,7 +23,8 @@ export default function SessionCostCard({ sessionId }: Props) {
     if (loading) return <div className="card animate-pulse h-48 bg-gray-100" />;
     if (!cost) return null;
 
-    const { chi_phi, thu_vang_lai, co_dinh, summary } = cost;
+    const { chi_phi, paid_list, summary } = cost;
+    const hasConfirmed = summary.has_confirmed;
 
     return (
         <div className="space-y-3">
@@ -50,63 +51,70 @@ export default function SessionCostCard({ sessionId }: Props) {
                 </div>
             </div>
 
-            {/* Thu từ vãng lai */}
-            <div className="card space-y-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">💰 Thu từ vãng lai</p>
+            {/* Đã thu được */}
+            {hasConfirmed ? (
+                <div className="card space-y-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">💰 Đã thu được</p>
 
-                {thu_vang_lai.male_count > 0 && (
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">
-                            ♂ {thu_vang_lai.male_count} nam × {fmt(thu_vang_lai.price_male)}
-                        </span>
-                        <span className="font-medium text-blue-600">{fmt(thu_vang_lai.male_total)}</span>
+                    <div className="space-y-1.5">
+                        {paid_list.map((p: any) => (
+                            <div key={p.registration_id} className="text-sm">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-gray-700">{p.full_name}</span>
+                                        {p.member_type === 'co_dinh' && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                                                Thành viên
+                                            </span>
+                                        )}
+                                        {p.member_type === 'vang_lai' && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200">
+                                                Vãng lai
+                                            </span>
+                                        )}
+                                        {p.is_guest && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200">
+                                                Khách
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="font-medium text-blue-600 flex-shrink-0">{fmt(p.total_amount)}</span>
+                                </div>
+                                {p.guest_names.length > 0 && (
+                                    <div className="pl-4 mt-0.5 text-xs text-gray-400">
+                                        + khách đi cùng: {p.guest_names.join(', ')}
+                                        {p.guests_amount > 0 ? ` (${fmt(p.guests_amount)})` : ' (đã gộp tiền)'}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                )}
 
-                {thu_vang_lai.female_count > 0 && (
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">
-                            ♀ {thu_vang_lai.female_count} nữ × {fmt(thu_vang_lai.price_female)}
-                        </span>
-                        <span className="font-medium text-pink-500">{fmt(thu_vang_lai.female_total)}</span>
+                    <div className="flex justify-between text-sm font-bold border-t border-gray-100 pt-2">
+                        <span>Tổng đã thu</span>
+                        <span className="text-blue-600">{fmt(summary.total_paid)}</span>
                     </div>
-                )}
-
-                {co_dinh.count > 0 && (
-                    <div className="flex justify-between text-sm text-gray-400">
-                        <span>🔵 {co_dinh.count} cố định</span>
-                        <span className="italic">→ phí tháng riêng</span>
-                    </div>
-                )}
-
-                <div className="flex justify-between text-sm font-bold border-t border-gray-100 pt-2">
-                    <span>Thu vãng lai</span>
-                    <span className="text-blue-600">{fmt(thu_vang_lai.total)}</span>
                 </div>
-            </div>
+            ) : (
+                <div className="card">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">💰 Đã thu được</p>
+                    <p className="text-sm text-gray-400 italic">Chưa có ai được xác nhận thanh toán</p>
+                </div>
+            )}
 
-            {/* Phần dư cố định bù */}
-            {co_dinh.count > 0 && (
-                <div className={`card space-y-1 border ${summary.phan_du_co_dinh > 0 ? 'border-purple-200 bg-purple-50' : 'border-green-200 bg-green-50'}`}>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ℹ️ Cố định bù phần còn lại</p>
-                    <p className={`text-sm ${summary.phan_du_co_dinh > 0 ? 'text-purple-800' : 'text-green-700'}`}>
-                        {fmt(summary.total_cost)} − {fmt(thu_vang_lai.total)} = <strong>{fmt(summary.phan_du_co_dinh)}</strong>
-                        {summary.phan_du_co_dinh > 0
-                            ? ' → cố định bù qua phí tháng'
-                            : ' → vãng lai đã đủ chi phí 🎉'
+            {/* Còn thiếu / dư */}
+            {hasConfirmed && (
+                <div className={`card space-y-1 border ${summary.remaining > 0 ? 'border-purple-200 bg-purple-50' : 'border-green-200 bg-green-50'}`}>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ℹ️ Kết quả</p>
+                    <p className={`text-sm ${summary.remaining > 0 ? 'text-purple-800' : 'text-green-700'}`}>
+                        {fmt(summary.total_cost)} − {fmt(summary.total_paid)} = <strong>{fmt(Math.abs(summary.remaining))}</strong>
+                        {summary.remaining > 0
+                            ? ' → còn thiếu'
+                            : summary.remaining < 0
+                                ? ' → thu dư'
+                                : ' → đủ chi phí 🎉'
                         }
                     </p>
-
-                    {/* Danh sách cố định */}
-                    {co_dinh.members.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                            {co_dinh.members.map((m: any) => (
-                                <span key={m.id} className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                                    {m.full_name}
-                                </span>
-                            ))}
-                        </div>
-                    )}
                 </div>
             )}
 

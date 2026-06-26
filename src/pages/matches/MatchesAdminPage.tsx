@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     CheckCircle2, XCircle, Hourglass, Clock,
     ChevronLeft, ChevronRight, RefreshCw,
-    Swords, Users, Trophy,
+    Swords, Users, Trophy, EyeOff, Eye,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -34,38 +34,34 @@ const STATUS_LABEL: Record<string, string> = {
     rejected: 'Từ chối',
 };
 
+/** Tính số set thắng từ mảng sets */
+function calcSetsWon(sets: any[], team: 'A' | 'B'): number {
+    if (!sets?.length) return 0;
+    return sets.filter(s =>
+        team === 'A' ? s.score_a > s.score_b : s.score_b > s.score_a
+    ).length;
+}
+
+function PlayerAvatar({ p, teamCls }: { p: any; teamCls: string }) {
+    return p?.avatar_url
+        ? <img src={p.avatar_url} alt={p.full_name} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+        : <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${teamCls}`}>
+            {p?.full_name?.[0]?.toUpperCase()}
+        </div>;
+}
+
 function PlayerNames({ p1, p2 }: { p1: any; p2?: any }) {
     return (
         <div className="flex items-center gap-1.5">
-            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 flex-shrink-0">
-                {p1?.full_name?.[0]?.toUpperCase()}
-            </div>
+            <PlayerAvatar p={p1} teamCls="bg-blue-100 text-blue-700" />
             <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">{p1?.full_name}</span>
             {p2 && (
                 <>
                     <span className="text-gray-300">/</span>
-                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 flex-shrink-0">
-                        {p2?.full_name?.[0]?.toUpperCase()}
-                    </div>
+                    <PlayerAvatar p={p1} teamCls="bg-blue-100 text-blue-700" />
                     <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">{p2?.full_name}</span>
                 </>
             )}
-        </div>
-    );
-}
-
-function SetScores({ sets }: { sets: any[] }) {
-    if (!sets?.length) return <span className="text-gray-300 text-xs">Chưa có kết quả</span>;
-    const sorted = [...sets].sort((a, b) => a.set_number - b.set_number);
-    return (
-        <div className="flex gap-1.5 flex-wrap">
-            {sorted.map((s) => (
-                <span key={s.set_number} className="text-xs font-mono bg-gray-50 border border-gray-200 rounded-lg px-2 py-0.5">
-                    S{s.set_number}: <span className={s.score_a > s.score_b ? 'text-green-600 font-bold' : 'text-red-500'}>{s.score_a}</span>
-                    –
-                    <span className={s.score_b > s.score_a ? 'text-green-600 font-bold' : 'text-red-500'}>{s.score_b}</span>
-                </span>
-            ))}
         </div>
     );
 }
@@ -79,6 +75,7 @@ export default function MatchesAdminPage() {
     const [actionId, setActionId] = useState<string | null>(null);
     const [showReject, setShowReject] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
+    const [hiddenMap, setHiddenMap] = useState<Record<string, boolean>>({});
 
     const fetchMatches = useCallback(async () => {
         setLoading(true);
@@ -86,8 +83,14 @@ export default function MatchesAdminPage() {
             const params: any = { page, limit: 15 };
             if (activeTab) params.status = activeTab;
             const { data } = await matchesApi.list(params);
-            setMatches(data.data ?? []);
+            const list = data.data ?? [];
+            setMatches(list);
             setMeta(data.meta ?? {});
+            const initial: Record<string, boolean> = {};
+            list.forEach((m: any) => {
+                initial[m.id] = !!m.is_hidden;
+            });
+            setHiddenMap(initial);
         } finally {
             setLoading(false);
         }
@@ -121,6 +124,20 @@ export default function MatchesAdminPage() {
         }
     };
 
+    const handleToggleHidden = async (id: string) => {
+        const nextHidden = !hiddenMap[id];
+        // Optimistic update
+        setHiddenMap(prev => ({ ...prev, [id]: nextHidden }));
+        try {
+            await api.patch(`/matches/${id}/visibility`, { is_hidden: nextHidden });
+            toast.success(nextHidden ? '🙈 Đã ẩn khỏi member' : '👁 Đã hiện lại cho member');
+        } catch {
+            // Rollback nếu lỗi
+            setHiddenMap(prev => ({ ...prev, [id]: !nextHidden }));
+            toast.error('Thao tác thất bại');
+        }
+    };
+
     return (
         <div className="space-y-4">
             {/* Header */}
@@ -128,7 +145,7 @@ export default function MatchesAdminPage() {
                 <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                     <Swords className="w-6 h-6 text-blue-600" /> Trận giao hữu
                 </h1>
-                <p className="text-gray-500 text-sm mt-0.5">Duyệt kết quả và tính điểm chai revice 🍾</p>
+                <p className="text-gray-500 text-sm mt-0.5">Duyệt kết quả và tính điểm</p>
             </div>
 
             {/* Tabs */}
@@ -165,9 +182,23 @@ export default function MatchesAdminPage() {
                     matches.map((m) => {
                         const busy = actionId === m.id;
                         const isPendingApproval = m.status === 'pending_approval';
+                        const isHidden = hiddenMap[m.id] ?? false;
+
+                        const hasScore = (m.status === 'approved' || m.status === 'pending_approval') && m.sets?.length > 0;
 
                         return (
-                            <div key={m.id} className="card space-y-3">
+                            <div
+                                key={m.id}
+                                className={`card space-y-3 transition-opacity ${isHidden ? 'opacity-60' : ''}`}
+                            >
+                                {/* Hidden badge */}
+                                {isHidden && (
+                                    <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-lg px-2.5 py-1 w-fit">
+                                        <EyeOff className="w-3 h-3" />
+                                        Đang ẩn với member
+                                    </div>
+                                )}
+
                                 {/* Row 1: Teams vs */}
                                 <div className="flex items-center gap-3">
                                     {/* Team A */}
@@ -178,17 +209,20 @@ export default function MatchesAdminPage() {
 
                                     {/* Score */}
                                     <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                        {m.status === 'approved' || m.status === 'pending_approval' ? (
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-2xl font-black ${m.winner_team === 'A' ? 'text-green-600' : 'text-gray-400'}`}>
-                                                    {m.team_a_sets_won}
-                                                </span>
-                                                <span className="text-gray-300 text-lg">–</span>
-                                                <span className={`text-2xl font-black ${m.winner_team === 'B' ? 'text-green-600' : 'text-gray-400'}`}>
-                                                    {m.team_b_sets_won}
-                                                </span>
-                                            </div>
-                                        ) : (
+                                        {hasScore ? (() => {
+                                            const s = m.sets[0];
+                                            return (
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-2xl font-black ${m.winner_team === 'A' ? 'text-green-600' : 'text-gray-400'}`}>
+                                                        {s.score_a}
+                                                    </span>
+                                                    <span className="text-gray-300 text-lg">–</span>
+                                                    <span className={`text-2xl font-black ${m.winner_team === 'B' ? 'text-green-600' : 'text-gray-400'}`}>
+                                                        {s.score_b}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })() : (
                                             <span className="text-gray-300 text-sm">VS</span>
                                         )}
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full border ${STATUS_BADGE[m.status] ?? ''}`}>
@@ -203,28 +237,24 @@ export default function MatchesAdminPage() {
                                             <span className="text-sm font-medium text-gray-900 truncate max-w-[2000px]">
                                                 {m.player_b1?.full_name}
                                             </span>
-                                            <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-bold text-red-700 flex-shrink-0">
-                                                {m.player_b1?.full_name?.[0]?.toUpperCase()}
-                                            </div>
+                                            <PlayerAvatar p={m.player_b1} teamCls="bg-red-100 text-red-700" />
                                             {m.player_b2 && (
                                                 <>
                                                     <span className="text-gray-300">/</span>
                                                     <span className="text-sm font-medium text-gray-900 truncate max-w-[2000px]">
                                                         {m.player_b2?.full_name}
                                                     </span>
-                                                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-bold text-red-700 flex-shrink-0">
-                                                        {m.player_b2?.full_name?.[0]?.toUpperCase()}
-                                                    </div>
+                                                    <PlayerAvatar p={m.player_b2} teamCls="bg-red-100 text-red-700" />
                                                 </>
                                             )}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Row 2: Set scores + meta */}
+                                {/* Row 2: Set scores + meta + actions */}
                                 <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-50">
                                     <div className="flex flex-col gap-1.5">
-                                        <SetScores sets={m.sets} />
+                                        {/* <SetScores sets={m.sets} /> */}
                                         <div className="flex items-center gap-3 text-xs text-gray-400">
                                             <span className="flex items-center gap-1">
                                                 {m.match_type === 'doubles'
@@ -232,49 +262,67 @@ export default function MatchesAdminPage() {
                                                     : <><Trophy className="w-3 h-3" /> Đơn</>
                                                 }
                                             </span>
-                                            <span>BO{m.best_of}</span>
+                                            {/* <span>BO{m.best_of}</span> */}
                                             {m.played_at && (
                                                 <span>{format(new Date(m.played_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</span>
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Action buttons */}
-                                    {isPendingApproval && showReject !== m.id && (
-                                        <div className="flex gap-2 flex-shrink-0">
-                                            <button
-                                                onClick={() => handleApprove(m.id)}
-                                                disabled={busy}
-                                                className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                            >
-                                                <CheckCircle2 className="w-3.5 h-3.5" /> Duyệt
-                                            </button>
-                                            <button
-                                                onClick={() => setShowReject(m.id)}
-                                                disabled={busy}
-                                                className="flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                            >
-                                                <XCircle className="w-3.5 h-3.5" /> Từ chối
-                                            </button>
-                                        </div>
-                                    )}
+                                    {/* Right-side actions */}
+                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                        {/* Approve / Reject buttons */}
+                                        {isPendingApproval && showReject !== m.id && (
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleApprove(m.id)}
+                                                    disabled={busy}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                                >
+                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Duyệt
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowReject(m.id)}
+                                                    disabled={busy}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5" /> Từ chối
+                                                </button>
+                                            </div>
+                                        )}
 
-                                    {/* Approved info */}
-                                    {m.status === 'approved' && (
-                                        <div className="text-right flex-shrink-0">
-                                            <p className="text-xs text-green-600 font-medium">✅ Đã tính điểm</p>
-                                            <p className="text-[10px] text-gray-400">
-                                                {m.winner_team === 'A'
-                                                    ? `${m.player_a1?.full_name} thắng`
-                                                    : `${m.player_b1?.full_name} thắng`}
-                                            </p>
-                                        </div>
-                                    )}
+                                        {/* Approved info */}
+                                        {m.status === 'approved' && (
+                                            <div className="text-right">
+                                                <p className="text-xs text-green-600 font-medium">✅ Đã tính điểm</p>
+                                                <p className="text-[10px] text-gray-400">
+                                                    {m.winner_team === 'A'
+                                                        ? `${m.player_a1?.full_name} thắng`
+                                                        : `${m.player_b1?.full_name} thắng`}
+                                                </p>
+                                            </div>
+                                        )}
 
-                                    {/* Rejected info */}
-                                    {m.status === 'rejected' && m.reject_reason && (
-                                        <p className="text-xs text-red-500 max-w-[160px] text-right">{m.reject_reason}</p>
-                                    )}
+                                        {/* Rejected info */}
+                                        {m.status === 'rejected' && m.reject_reason && !m.reject_reason.includes('chưa') && (
+                                            <p className="text-xs text-red-500 max-w-[160px] text-right">{m.reject_reason}</p>
+                                        )}
+
+                                        {/* ── Nút ẩn/hiện (admin only) ── */}
+                                        <button
+                                            onClick={() => handleToggleHidden(m.id)}
+                                            className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${isHidden
+                                                ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
+                                                : 'bg-white border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+                                                }`}
+                                            title={isHidden ? 'Hiện lại với member' : 'Ẩn khỏi member'}
+                                        >
+                                            {isHidden
+                                                ? <><RefreshCw className="w-3 h-3" /> Khôi phục</>
+                                                : <><EyeOff className="w-3 h-3" /> Ẩn</>
+                                            }
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Reject input */}

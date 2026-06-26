@@ -13,8 +13,7 @@ import RegistrationsPage from './pages/registrations/RegistrationsPage';
 import LeaderboardPage from './pages/leaderboard/LeaderboardPage';
 import MatchesAdminPage from './pages/matches/MatchesAdminPage';
 import WinRateLeaderboardPage from './pages/rankings/WinRateLeaderboardPage';
-import CostReportPage from './pages/reports/CostReportPage';
-import SessionGuestsPage from './pages/sessions/SessionGuestsPage';
+import SessionFinishPage from './pages/sessions/SessionFinishPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -48,9 +47,7 @@ export default function App() {
 
         <Route path="/rankings/win-rate" element={<ProtectedRoute><WinRateLeaderboardPage /></ProtectedRoute>} />
 
-        <Route path="/reports" element={<ProtectedRoute><CostReportPage /></ProtectedRoute>} />
-
-        <Route path="/sessions/guest" element={<ProtectedRoute><SessionGuestsPage /></ProtectedRoute>} />
+        <Route path='/sessions/:id/finish' element={<ProtectedRoute><SessionFinishPage /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
