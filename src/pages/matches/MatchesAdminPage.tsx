@@ -3,11 +3,13 @@ import {
     CheckCircle2, XCircle, Hourglass, Clock,
     ChevronLeft, ChevronRight, RefreshCw,
     Swords, Users, Trophy, EyeOff, Eye,
+    Plus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { api, matchesApi } from '../../api';
+import { CreateMatchModal } from '../../components/matches/CreateMatchModal';
 
 
 const STATUS_TABS = [
@@ -34,13 +36,6 @@ const STATUS_LABEL: Record<string, string> = {
     rejected: 'Từ chối',
 };
 
-/** Tính số set thắng từ mảng sets */
-function calcSetsWon(sets: any[], team: 'A' | 'B'): number {
-    if (!sets?.length) return 0;
-    return sets.filter(s =>
-        team === 'A' ? s.score_a > s.score_b : s.score_b > s.score_a
-    ).length;
-}
 
 function PlayerAvatar({ p, teamCls }: { p: any; teamCls: string }) {
     return p?.avatar_url
@@ -76,6 +71,7 @@ export default function MatchesAdminPage() {
     const [showReject, setShowReject] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
     const [hiddenMap, setHiddenMap] = useState<Record<string, boolean>>({});
+    const [showCreateModal, setShowCreateModal] = useState(false);
 
     const fetchMatches = useCallback(async () => {
         setLoading(true);
@@ -141,11 +137,19 @@ export default function MatchesAdminPage() {
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                    <Swords className="w-6 h-6 text-blue-600" /> Trận giao hữu
-                </h1>
-                <p className="text-gray-500 text-sm mt-0.5">Duyệt kết quả và tính điểm</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <Swords className="w-6 h-6 text-blue-600" /> Trận giao hữu
+                    </h1>
+                    <p className="text-gray-500 text-sm mt-0.5">Duyệt kết quả và tính điểm</p>
+                </div>
+                <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors"
+                >
+                    <Plus className="w-4 h-4" /> Tạo trận
+                </button>
             </div>
 
             {/* Tabs */}
@@ -356,6 +360,13 @@ export default function MatchesAdminPage() {
                     })
                 )}
             </div>
+
+            {showCreateModal && (
+                <CreateMatchModal
+                    onClose={() => setShowCreateModal(false)}
+                    onCreated={() => { setShowCreateModal(false); fetchMatches(); }}
+                />
+            )}
 
             {/* Pagination */}
             {meta.total_pages > 1 && (

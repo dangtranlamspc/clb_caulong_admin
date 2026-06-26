@@ -94,10 +94,12 @@ export const matchesApi = {
   decline: (id: string, reason?: string) => api.patch(`/matches/${id}/decline`, { reason }),
   submitResult: (id: string, data: any) => api.patch(`/matches/${id}/result`, data),
 
+
   // Admin
   list: (params?: any) => api.get('/matches', { params }),
   approve: (id: string, note?: string) => api.patch(`/matches/${id}/approve`, { note }),
   reject: (id: string, reason: string) => api.patch(`/matches/${id}/reject`, { reject_reason: reason }),
+  adminCreate: (data: any) => api.post('/matches/admin-create', data),
 };
 
 export const rankingsApi = {
