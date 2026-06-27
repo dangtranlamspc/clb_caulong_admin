@@ -89,32 +89,67 @@ function RowActions({
   actionLoading,
   onToggleActive,
   onDelete,
-  size = 'normal',
+  variant = 'table',
 }: {
   user: any;
   actionLoading: string | null;
   onToggleActive: (id: string) => void;
   onDelete: (id: string, name: string) => void;
-  size?: 'normal' | 'compact';
+  variant?: 'table' | 'mobile';
 }) {
-  const btnPad = size === 'compact' ? 'p-2' : 'p-1.5';
+  const busy = actionLoading === user.id;
+
+  if (variant === 'mobile') {
+    return (
+      <div className="flex items-center gap-2">
+        <Link
+          to={`/members/${user.id}`}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+        >
+          <Eye className="w-3.5 h-3.5" /> Xem
+        </Link>
+        <button
+          onClick={() => onToggleActive(user.id)}
+          disabled={busy}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-medium transition-colors disabled:opacity-50 ${user.is_active
+            ? 'bg-amber-500 hover:bg-amber-600'
+            : 'bg-green-500 hover:bg-green-600'
+            }`}
+        >
+          {user.is_active
+            ? <ToggleRight className="w-3.5 h-3.5" />
+            : <ToggleLeft className="w-3.5 h-3.5" />
+          }
+          {user.is_active ? 'Tạm ẩn' : 'Kích hoạt'}
+        </button>
+        <button
+          onClick={() => onDelete(user.id, user.full_name)}
+          disabled={busy}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Xóa
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-end gap-1">
       <Link
         to={`/members/${user.id}`}
-        className={`${btnPad} text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors`}
+        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
         title="Xem / Sửa"
       >
         <Eye className="w-4 h-4" />
       </Link>
       <button
         onClick={() => onToggleActive(user.id)}
-        disabled={actionLoading === user.id}
-        className={`${btnPad} rounded-lg transition-colors ${user.is_active
+        disabled={busy}
+        className={`p-1.5 rounded-lg transition-colors ${user.is_active
           ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
           : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
           }`}
-        title={user.is_active ? 'Vô hiệu hóa' : 'Kích hoạt'}
+        title={user.is_active ? 'Tạm ẩn' : 'Kích hoạt'}
       >
         {user.is_active
           ? <ToggleRight className="w-4 h-4" />
@@ -123,8 +158,8 @@ function RowActions({
       </button>
       <button
         onClick={() => onDelete(user.id, user.full_name)}
-        disabled={actionLoading === user.id}
-        className={`${btnPad} text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors`}
+        disabled={busy}
+        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
         title="Xóa"
       >
         <Trash2 className="w-4 h-4" />
@@ -309,10 +344,7 @@ export default function MembersPage() {
         )}
       </div>
 
-      {/* List container — card list trên mobile, table trên desktop (md+) */}
       <div className="card !p-0 overflow-hidden">
-
-        {/* ─── Mobile: card list (< md) ─────────────────────────────── */}
         <div className="md:hidden bg-gray-50 p-3 space-y-3">
           {loading ? (
             [...Array(6)].map((_, i) => (
@@ -332,7 +364,6 @@ export default function MembersPage() {
             </div>
           ) : users.map((user) => (
             <div key={user.id} className="p-4 space-y-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-              {/* Avatar + tên + email/sđt + trạng thái */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar user={user} sizeClass="w-10 h-10 text-sm" />
@@ -347,7 +378,6 @@ export default function MembersPage() {
                 </span>
               </div>
 
-              {/* Vai trò + trình độ + phân cấp */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={user.role === 'admin' ? 'badge-admin' : 'badge-member'}>
@@ -369,14 +399,13 @@ export default function MembersPage() {
                   actionLoading={actionLoading}
                   onToggleActive={handleToggleActive}
                   onDelete={handleDelete}
-                  size="compact"
+                  variant="mobile"
                 />
               </div>
             </div>
           ))}
         </div>
 
-        {/* ─── Desktop: table (md+) ─────────────────────────────────── */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
