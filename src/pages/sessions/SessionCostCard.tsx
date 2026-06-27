@@ -45,6 +45,19 @@ export default function SessionCostCard({ sessionId }: Props) {
                     <span className="font-medium">{fmt(chi_phi.court_fee)}</span>
                 </div>
 
+                {/* ── Khoản thu khác — chỉ hiện khi có giá trị ── */}
+                {chi_phi.other_fee > 0 && (
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">
+                            💰 Khoản thu khác
+                            {chi_phi.other_fee_note && (
+                                <span className="text-gray-400 italic"> ({chi_phi.other_fee_note})</span>
+                            )}
+                        </span>
+                        <span className="font-medium">{fmt(chi_phi.other_fee)}</span>
+                    </div>
+                )}
+
                 <div className="flex justify-between text-sm font-bold border-t border-gray-100 pt-2">
                     <span>Tổng chi phí</span>
                     <span className="text-gray-900">{fmt(summary.total_cost)}</span>

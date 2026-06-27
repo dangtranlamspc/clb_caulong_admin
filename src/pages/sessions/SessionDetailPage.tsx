@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
     ArrowLeft, CalendarDays, MapPin, Clock, Users,
     CheckCircle2, XCircle, Hourglass, Phone, Mail,
     UserPlus, Search, Loader2, Eye, CornerDownRight,
     UserX,
     UserCheck,
+    Calculator
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -217,7 +218,7 @@ export default function SessionDetailPage() {
     const guestsOf = (hostId: string) => registrations.filter(r => r.host_registration_id === hostId);
     const hasCostData =
         (session.status === 'completed' || session.status === 'waiting_payment') &&
-        (Number(session.court_fee ?? 0) > 0 || Number(session.shuttle_count ?? 0) > 0);
+        (Number(session.court_fee ?? 0) > 0 || Number(session.shuttle_count ?? 0) > 0 || Number(session.other_fee ?? 0) > 0);
 
     const canAddMember = session.status === 'open' || session.status === 'full';
 
@@ -242,149 +243,157 @@ export default function SessionDetailPage() {
         const canReviewPayment =
             Boolean(reg.payment_reference) || (reg.is_guest && !reg.host_registration_id);
 
+        // Tách riêng node action ra biến — render trên dòng riêng phía dưới info,
+        // tránh chiếm chỗ ngang với badge/tên gây bóp méo layout trên mobile
+        const actionsNode = reg.participation_status === 'awaiting_checkin' ? (
+            <>
+                <button
+                    onClick={() => handleCheckinPresent(reg.id)}
+                    disabled={busy}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                    Có mặt
+                </button>
+                <button
+                    onClick={() => handleCheckinAbsent(reg.id, displayName)}
+                    disabled={busy}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-100 hover:bg-red-200 text-red-600 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                    <UserX className="w-4 h-4" />
+                    Vắng mặt
+                </button>
+            </>
+        ) : (reg.payment_proof_url || (reg.payment_status === 'pending' && canReviewPayment)) ? (
+            <>
+                {reg.payment_proof_url && (
+                    <button
+                        onClick={() => setViewingBillUrl(reg.payment_proof_url)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Xem ảnh bill chuyển khoản"
+                    >
+                        <Eye className="w-4 h-4" />
+                    </button>
+                )}
+
+                {reg.payment_status === 'pending' && canReviewPayment && (
+                    <>
+                        <button
+                            onClick={() => handleConfirm(reg.id)}
+                            disabled={busy}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                        >
+                            <CheckCircle2 className="w-4 h-4" />
+                            Xác nhận
+                        </button>
+                        <button
+                            onClick={() => setShowReject(showReject === reg.id ? null : reg.id)}
+                            disabled={busy}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-600 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                        >
+                            <XCircle className="w-4 h-4" />
+                            Từ chối
+                        </button>
+                    </>
+                )}
+            </>
+        ) : null;
+
         return (
             <div key={reg.id} className={isNested ? 'bg-gray-50/60' : ''}>
-                <div className={`flex items-start gap-3 ${isNested ? 'pl-9 pr-4 py-2.5' : 'px-4 py-3'}`}>
-                    {isNested && (
-                        <CornerDownRight className="w-4 h-4 text-gray-300 mt-1.5 flex-shrink-0" />
-                    )}
-
-                    {/* Avatar */}
-                    <div className={`rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 ${isNested ? 'w-7 h-7' : 'w-9 h-9'}`}>
-                        <span className={`text-blue-700 font-semibold ${isNested ? 'text-xs' : 'text-sm'}`}>
-                            {displayName?.[0]?.toUpperCase() ?? '?'}
-                        </span>
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`font-medium text-gray-900 ${isNested ? 'text-sm' : ''}`}>{displayName}</span>
-
-                            {user?.member_type && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full border ${user.member_type === 'co_dinh'
-                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                    : 'bg-gray-50 text-gray-500 border-gray-200'
-                                    }`}>
-                                    {user.member_type === 'co_dinh' ? '🔵 Thành viên' : '⚪ Vãng lai'}
-                                </span>
-                            )}
-
-                            {/* badge khách không tài khoản */}
-                            {reg.is_guest && (
-                                <span className="text-xs px-2 py-0.5 rounded-full border bg-gray-50 text-gray-500 border-gray-200">
-                                    ⚪ Khách
-                                </span>
-                            )}
-
-                            <span className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 ${cfg.cls}`}>
-                                <StatusIcon className="w-3 h-3" />
-                                {cfg.label}
-                            </span>
-
-                            {reg.points_awarded && (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                                    🏸 Đã cộng điểm
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-gray-500">
-                            {/* Phone/email — chỉ user thật có */}
-                            {user?.phone && (
-                                <span className="flex items-center gap-1">
-                                    <Phone className="w-3 h-3" />{user.phone}
-                                </span>
-                            )}
-                            {user?.email && (
-                                <span className="flex items-center gap-1">
-                                    <Mail className="w-3 h-3" />{user.email}
-                                </span>
-                            )}
-
-                            {/* Giới tính + trình độ — cho cả guest */}
-                            {displayGender && (
-                                <span>{displayGender === 'male' ? 'Nam' : 'Nữ'}</span>
-                            )}
-                            {reg.guest_skill_level && (
-                                <span>· {SKILL_LABEL[reg.guest_skill_level] ?? reg.guest_skill_level}</span>
-                            )}
-
-                            {reg.payment_reference && (
-                                <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">
-                                    {reg.payment_reference}
-                                </span>
-                            )}
-                        </div>
-
-                        {reg.notes && (
-                            <p className="text-xs text-gray-400 mt-1 italic">{reg.notes}</p>
+                <div className={isNested ? 'pl-9 pr-4 py-2.5' : 'px-4 py-3'}>
+                    {/* Hàng avatar + info — không còn bị action buttons chen vào */}
+                    <div className="flex items-start gap-3">
+                        {isNested && (
+                            <CornerDownRight className="w-4 h-4 text-gray-300 mt-1.5 flex-shrink-0" />
                         )}
+
+                        <div className={`rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 ${isNested ? 'w-7 h-7' : 'w-9 h-9'}`}>
+                            <span className={`text-blue-700 font-semibold ${isNested ? 'text-xs' : 'text-sm'}`}>
+                                {displayName?.[0]?.toUpperCase() ?? '?'}
+                            </span>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`font-medium text-gray-900 ${isNested ? 'text-sm' : ''}`}>{displayName}</span>
+
+                                {user?.member_type && (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full border ${user.member_type === 'co_dinh'
+                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                        : 'bg-gray-50 text-gray-500 border-gray-200'
+                                        }`}>
+                                        {user.member_type === 'co_dinh' ? '🔵 Thành viên' : '⚪ Vãng lai'}
+                                    </span>
+                                )}
+
+                                {reg.is_guest && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full border bg-gray-50 text-gray-500 border-gray-200">
+                                        ⚪ Khách
+                                    </span>
+                                )}
+
+                                {reg.payment_method === 'cash' && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                        💵 Tiền mặt
+                                    </span>
+                                )}
+
+                                <span className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 whitespace-nowrap ${cfg.cls}`}>
+                                    <StatusIcon className="w-3 h-3" />
+                                    {cfg.label}
+                                </span>
+
+                                {reg.points_awarded && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                                        🏸 Đã cộng điểm
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-gray-500">
+                                {user?.phone && (
+                                    <span className="flex items-center gap-1">
+                                        <Phone className="w-3 h-3" />{user.phone}
+                                    </span>
+                                )}
+                                {user?.email && (
+                                    <span className="flex items-center gap-1">
+                                        <Mail className="w-3 h-3" />{user.email}
+                                    </span>
+                                )}
+
+                                {displayGender && (
+                                    <span>{displayGender === 'male' ? 'Nam' : 'Nữ'}</span>
+                                )}
+                                {reg.guest_skill_level && (
+                                    <span>· {SKILL_LABEL[reg.guest_skill_level] ?? reg.guest_skill_level}</span>
+                                )}
+
+                                {reg.payment_reference && (
+                                    <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                                        {reg.payment_reference}
+                                    </span>
+                                )}
+                            </div>
+
+                            {reg.notes && (
+                                <p className="text-xs text-gray-400 mt-1 italic">{reg.notes}</p>
+                            )}
+                        </div>
                     </div>
 
-
-                    {reg.participation_status === 'awaiting_checkin' ? (
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <button
-                                onClick={() => handleCheckinPresent(reg.id)}
-                                disabled={busy}
-                                className="flex items-center gap-1 px-2.5 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                            >
-                                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
-                                Có mặt
-                            </button>
-                            <button
-                                onClick={() => handleCheckinAbsent(reg.id, displayName)}
-                                disabled={busy}
-                                className="flex items-center gap-1 px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                            >
-                                <UserX className="w-3.5 h-3.5" />
-                                Vắng mặt
-                            </button>
-                        </div>
-                    ) : (reg.payment_proof_url || (reg.payment_status === 'pending' && canReviewPayment)) && (
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                            {reg.payment_proof_url && (
-                                <button
-                                    onClick={() => setViewingBillUrl(reg.payment_proof_url)}
-                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    title="Xem ảnh bill chuyển khoản"
-                                >
-                                    <Eye className="w-4 h-4" />
-                                </button>
-                            )}
-
-                            {reg.payment_status === 'pending' && canReviewPayment && (
-                                <>
-                                    <button
-                                        onClick={() => handleConfirm(reg.id)}
-                                        disabled={busy}
-                                        className="flex items-center gap-1 px-2.5 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                                    >
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                        Xác nhận
-                                    </button>
-                                    <button
-                                        onClick={() => setShowReject(showReject === reg.id ? null : reg.id)}
-                                        disabled={busy}
-                                        className="flex items-center gap-1 px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                                    >
-                                        <XCircle className="w-3.5 h-3.5" />
-                                        Từ chối
-                                    </button>
-                                </>
-                            )}
+                    {/* Action buttons — dòng riêng phía dưới, full chiều rộng trên mobile */}
+                    {actionsNode && (
+                        <div className="flex items-center gap-2 flex-wrap mt-3 sm:justify-end">
+                            {actionsNode}
                         </div>
                     )}
-                    {/* 
-                    {(reg.payment_proof_url || (reg.payment_status === 'pending' && canReviewPayment)) && (
-                        
-                    )} */}
                 </div>
 
                 {/* Reject reason input */}
                 {showReject === reg.id && (
-                    <div className={`mb-3 flex gap-2 ${isNested ? 'ml-20 pr-4' : 'ml-12 mt-2'}`}>
+                    <div className={`${isNested ? 'pl-9 pr-4' : 'px-4'} pb-3 flex gap-2`}>
                         <input
                             type="text"
                             value={rejectNotes[reg.id] ?? ''}
@@ -408,17 +417,30 @@ export default function SessionDetailPage() {
     return (
         <div className="max-w-3xl mx-auto space-y-4">
             {/* Header */}
-            <div className="flex items-center gap-3">
-                <button onClick={() => navigate('/sessions')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <button onClick={() => navigate('/sessions')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h1 className="text-xl font-bold text-gray-900 flex-1 truncate">{session.title}</h1>
+                <h1 className="text-xl font-bold text-gray-900 flex-1 min-w-[100px] truncate">{session.title}</h1>
+                {canAddMember && awaitingCheckin.length > 0 && (
+                    <span className="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg flex-shrink-0">
+                        Còn {awaitingCheckin.length} người chưa điểm danh
+                    </span>
+                )}
+                {canAddMember && awaitingCheckin.length === 0 && (
+                    <Link
+                        to={`/sessions/${id}/finish`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors flex-shrink-0"                  >
+                        <Calculator className="w-4 h-4" /> Kết thúc
+                    </Link>
+                )}
                 {canAddMember && (
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors flex-shrink-0"
+                        className="flex items-center justify-center gap-1.5 w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors flex-shrink-0"
                     >
-                        <UserPlus className="w-4 h-4" /> Thêm thành viên
+                        <UserPlus className="w-4 h-4" />
+                        <span className="hidden sm:inline">Thêm thành viên</span>
                     </button>
                 )}
             </div>
@@ -498,226 +520,230 @@ export default function SessionDetailPage() {
             </div>
 
             {/* ── Modal xem ảnh bill chuyển khoản ── */}
-            {viewingBillUrl && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-                    onClick={() => setViewingBillUrl(null)}
-                >
-                    <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
-                        <button
-                            onClick={() => setViewingBillUrl(null)}
-                            className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
-                            title="Đóng"
-                        >
-                            <XCircle className="w-7 h-7" />
-                        </button>
-                        <img
-                            src={viewingBillUrl}
-                            alt="Ảnh bill chuyển khoản"
-                            className="w-full max-h-[80vh] object-contain rounded-xl bg-white"
-                        />
+            {
+                viewingBillUrl && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                        onClick={() => setViewingBillUrl(null)}
+                    >
+                        <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
+                            <button
+                                onClick={() => setViewingBillUrl(null)}
+                                className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
+                                title="Đóng"
+                            >
+                                <XCircle className="w-7 h-7" />
+                            </button>
+                            <img
+                                src={viewingBillUrl}
+                                alt="Ảnh bill chuyển khoản"
+                                className="w-full max-h-[80vh] object-contain rounded-xl bg-white"
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* ── Add member modal ── */}
-            {showAddModal && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-                    onClick={closeAddModal}
-                >
+            {
+                showAddModal && (
                     <div
-                        className="bg-white rounded-2xl w-full max-w-md shadow-xl"
-                        onClick={e => e.stopPropagation()}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                        onClick={closeAddModal}
                     >
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                            <h3 className="font-bold text-gray-900">Thêm thành viên vào buổi</h3>
-                            <button onClick={closeAddModal} className="p-1 text-gray-400 hover:text-gray-600">
-                                <XCircle className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="flex gap-1 px-5 pt-3">
-                            {[['account', 'Có tài khoản'], ['guest', 'Khách không tài khoản']].map(([val, lbl]) => (
-                                <button key={val} onClick={() => setAddTab(val as any)}
-                                    className={`flex-1 py-1.5 rounded-lg text-sm font-medium ${addTab === val ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>
-                                    {lbl}
+                        <div
+                            className="bg-white rounded-2xl w-full max-w-md shadow-xl"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                                <h3 className="font-bold text-gray-900">Thêm thành viên vào buổi</h3>
+                                <button onClick={closeAddModal} className="p-1 text-gray-400 hover:text-gray-600">
+                                    <XCircle className="w-5 h-5" />
                                 </button>
-                            ))}
-                        </div>
+                            </div>
 
-                        <div className="p-5 space-y-4">
-                            {addTab === 'account' ? (
-                                !selectedMember ? (
-                                    <>
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <div className="flex gap-1 px-5 pt-3">
+                                {[['account', 'Có tài khoản'], ['guest', 'Khách không tài khoản']].map(([val, lbl]) => (
+                                    <button key={val} onClick={() => setAddTab(val as any)}
+                                        className={`flex-1 py-1.5 rounded-lg text-sm font-medium ${addTab === val ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>
+                                        {lbl}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="p-5 space-y-4">
+                                {addTab === 'account' ? (
+                                    !selectedMember ? (
+                                        <>
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                <input
+                                                    autoFocus
+                                                    value={search}
+                                                    onChange={e => setSearch(e.target.value)}
+                                                    className="input-field pl-9"
+                                                    placeholder="Tìm theo tên hoặc số điện thoại..."
+                                                />
+                                            </div>
+                                            <div className="max-h-60 overflow-y-auto -mx-1">
+                                                {searching ? (
+                                                    <p className="text-sm text-gray-400 text-center py-4">Đang tìm...</p>
+                                                ) : search.trim().length < 2 ? (
+                                                    <p className="text-sm text-gray-400 text-center py-4">Nhập ít nhất 2 ký tự để tìm</p>
+                                                ) : searchResults.length === 0 ? (
+                                                    <p className="text-sm text-gray-400 text-center py-4">Không tìm thấy thành viên</p>
+                                                ) : (
+                                                    <ul className="space-y-1">
+                                                        {searchResults.map(m => (
+                                                            <li key={m.id}>
+                                                                <button
+                                                                    onClick={() => setSelectedMember(m)}
+                                                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-left transition-colors"
+                                                                >
+                                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-700">
+                                                                        {m.full_name?.[0]?.toUpperCase() ?? '?'}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
+                                                                        <p className="text-xs text-gray-400">{m.phone}</p>
+                                                                    </div>
+                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${m.member_type === 'co_dinh'
+                                                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                        : 'bg-gray-50 text-gray-500 border-gray-200'
+                                                                        }`}>
+                                                                        {m.member_type === 'co_dinh' ? 'Thành viên' : 'Vãng lai'}
+                                                                    </span>
+                                                                </button>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-3">
+                                                <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-blue-700">
+                                                    {selectedMember.full_name?.[0]?.toUpperCase() ?? '?'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-gray-900 truncate">{selectedMember.full_name}</p>
+                                                    <p className="text-xs text-gray-500">{selectedMember.phone}</p>
+                                                </div>
+                                                <button onClick={() => setSelectedMember(null)} className="text-xs text-blue-600 font-medium flex-shrink-0">
+                                                    Đổi
+                                                </button>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tuỳ chọn)</label>
+                                                <input
+                                                    value={addNotes}
+                                                    onChange={e => setAddNotes(e.target.value)}
+                                                    className="input-field"
+                                                    placeholder="VD: Khách vãng lai đăng ký trực tiếp"
+                                                />
+                                            </div>
+
+                                            <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+                                                ⓘ Thành viên sẽ nhận được thông báo đã được thêm vào buổi. Thanh toán sau khi buổi kết thúc.
+                                            </p>
+                                        </>
+                                    )
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Họ tên *</label>
                                             <input
-                                                autoFocus
-                                                value={search}
-                                                onChange={e => setSearch(e.target.value)}
-                                                className="input-field pl-9"
-                                                placeholder="Tìm theo tên hoặc số điện thoại..."
+                                                value={guestForm.full_name}
+                                                onChange={e => setGuestForm(f => ({ ...f, full_name: e.target.value }))}
+                                                className="input-field"
+                                                placeholder="Tên khách"
                                             />
                                         </div>
-                                        <div className="max-h-60 overflow-y-auto -mx-1">
-                                            {searching ? (
-                                                <p className="text-sm text-gray-400 text-center py-4">Đang tìm...</p>
-                                            ) : search.trim().length < 2 ? (
-                                                <p className="text-sm text-gray-400 text-center py-4">Nhập ít nhất 2 ký tự để tìm</p>
-                                            ) : searchResults.length === 0 ? (
-                                                <p className="text-sm text-gray-400 text-center py-4">Không tìm thấy thành viên</p>
-                                            ) : (
-                                                <ul className="space-y-1">
-                                                    {searchResults.map(m => (
-                                                        <li key={m.id}>
-                                                            <button
-                                                                onClick={() => setSelectedMember(m)}
-                                                                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-left transition-colors"
-                                                            >
-                                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-700">
-                                                                    {m.full_name?.[0]?.toUpperCase() ?? '?'}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
-                                                                    <p className="text-xs text-gray-400">{m.phone}</p>
-                                                                </div>
-                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${m.member_type === 'co_dinh'
-                                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                                    : 'bg-gray-50 text-gray-500 border-gray-200'
-                                                                    }`}>
-                                                                    {m.member_type === 'co_dinh' ? 'Thành viên' : 'Vãng lai'}
-                                                                </span>
-                                                            </button>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-3">
-                                            <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-blue-700">
-                                                {selectedMember.full_name?.[0]?.toUpperCase() ?? '?'}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
+                                                <select
+                                                    value={guestForm.gender}
+                                                    onChange={e => setGuestForm(f => ({ ...f, gender: e.target.value }))}
+                                                    className="input-field"
+                                                >
+                                                    <option value="male">Nam</option>
+                                                    <option value="female">Nữ</option>
+                                                </select>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-gray-900 truncate">{selectedMember.full_name}</p>
-                                                <p className="text-xs text-gray-500">{selectedMember.phone}</p>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Trình độ</label>
+                                                <select
+                                                    value={guestForm.skill_level}
+                                                    onChange={e => setGuestForm(f => ({ ...f, skill_level: e.target.value }))}
+                                                    className="input-field"
+                                                >
+                                                    <option value="">-- Chọn --</option>
+                                                    <option value="yeu">Yếu</option>
+                                                    <option value="trung_binh_yeu">TB Yếu</option>
+                                                    <option value="trung_binh">Trung bình</option>
+                                                    <option value="trung_binh_cong">TB+</option>
+                                                    <option value="ban_chuyen">Bán chuyên</option>
+                                                    <option value="chuyen_nghiep">Chuyên nghiệp</option>
+                                                </select>
                                             </div>
-                                            <button onClick={() => setSelectedMember(null)} className="text-xs text-blue-600 font-medium flex-shrink-0">
-                                                Đổi
-                                            </button>
                                         </div>
-
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Đi cùng (tuỳ chọn, để gộp tiền)
+                                            </label>
+                                            <select
+                                                value={hostRegId}
+                                                onChange={e => setHostRegId(e.target.value)}
+                                                className="input-field"
+                                            >
+                                                <option value="">-- Không, tính tiền riêng --</option>
+                                                {registrations.filter(r => !r.is_guest).map((r: any) => (
+                                                    <option key={r.id} value={r.id}>{r.users?.full_name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tuỳ chọn)</label>
                                             <input
                                                 value={addNotes}
                                                 onChange={e => setAddNotes(e.target.value)}
                                                 className="input-field"
-                                                placeholder="VD: Khách vãng lai đăng ký trực tiếp"
                                             />
                                         </div>
-
-                                        <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
-                                            ⓘ Thành viên sẽ nhận được thông báo đã được thêm vào buổi. Thanh toán sau khi buổi kết thúc.
-                                        </p>
-                                    </>
-                                )
-                            ) : (
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Họ tên *</label>
-                                        <input
-                                            value={guestForm.full_name}
-                                            onChange={e => setGuestForm(f => ({ ...f, full_name: e.target.value }))}
-                                            className="input-field"
-                                            placeholder="Tên khách"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
-                                            <select
-                                                value={guestForm.gender}
-                                                onChange={e => setGuestForm(f => ({ ...f, gender: e.target.value }))}
-                                                className="input-field"
-                                            >
-                                                <option value="male">Nam</option>
-                                                <option value="female">Nữ</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Trình độ</label>
-                                            <select
-                                                value={guestForm.skill_level}
-                                                onChange={e => setGuestForm(f => ({ ...f, skill_level: e.target.value }))}
-                                                className="input-field"
-                                            >
-                                                <option value="">-- Chọn --</option>
-                                                <option value="yeu">Yếu</option>
-                                                <option value="trung_binh_yeu">TB Yếu</option>
-                                                <option value="trung_binh">Trung bình</option>
-                                                <option value="trung_binh_cong">TB+</option>
-                                                <option value="ban_chuyen">Bán chuyên</option>
-                                                <option value="chuyen_nghiep">Chuyên nghiệp</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Đi cùng (tuỳ chọn, để gộp tiền)
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={guestPaidNow}
+                                                onChange={e => setGuestPaidNow(e.target.checked)}
+                                                className="w-4 h-4 rounded text-blue-600"
+                                            />
+                                            <span className="text-sm text-gray-700">Đã thu tiền mặt tại sân ngay</span>
                                         </label>
-                                        <select
-                                            value={hostRegId}
-                                            onChange={e => setHostRegId(e.target.value)}
-                                            className="input-field"
-                                        >
-                                            <option value="">-- Không, tính tiền riêng --</option>
-                                            {registrations.filter(r => !r.is_guest).map((r: any) => (
-                                                <option key={r.id} value={r.id}>{r.users?.full_name}</option>
-                                            ))}
-                                        </select>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tuỳ chọn)</label>
-                                        <input
-                                            value={addNotes}
-                                            onChange={e => setAddNotes(e.target.value)}
-                                            className="input-field"
-                                        />
-                                    </div>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={guestPaidNow}
-                                            onChange={e => setGuestPaidNow(e.target.checked)}
-                                            className="w-4 h-4 rounded text-blue-600"
-                                        />
-                                        <span className="text-sm text-gray-700">Đã thu tiền mặt tại sân ngay</span>
-                                    </label>
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
 
-                        <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100">
-                            <button onClick={closeAddModal} className="btn-secondary text-sm">Hủy</button>
-                            <button
-                                onClick={handleAddMember}
-                                disabled={
-                                    adding ||
-                                    (addTab === 'account' ? !selectedMember : !guestForm.full_name.trim())
-                                }
-                                className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
-                            >
-                                {adding && <Loader2 className="w-4 h-4 animate-spin" />}
-                                Thêm vào buổi
-                            </button>
+                            <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100">
+                                <button onClick={closeAddModal} className="btn-secondary text-sm">Hủy</button>
+                                <button
+                                    onClick={handleAddMember}
+                                    disabled={
+                                        adding ||
+                                        (addTab === 'account' ? !selectedMember : !guestForm.full_name.trim())
+                                    }
+                                    className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {adding && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Thêm vào buổi
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

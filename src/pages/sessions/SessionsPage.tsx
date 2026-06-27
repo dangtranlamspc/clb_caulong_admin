@@ -100,7 +100,7 @@ export default function SessionsPage() {
                             <button
                                 key={val}
                                 onClick={() => setQuery(q => ({ ...q, status: val, page: 1 }))}
-                                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${query.status === val
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${query.status === val
                                     ? 'bg-white text-gray-900 shadow-sm'
                                     : 'text-gray-500 hover:text-gray-700'
                                     }`}
@@ -111,8 +111,8 @@ export default function SessionsPage() {
                     )}
                 </div>
 
-                <Link to="/sessions/create" className="btn-primary flex items-center gap-2 text-sm">
-                    <Plus className="w-4 h-4" />
+                <Link to="/sessions/create" className="btn-primary flex items-center gap-2 text-sm px-5 py-2.5 font-medium">
+                    <Plus className="w-5 h-5" />
                     <span className="hidden sm:inline">Tạo buổi</span>
                 </Link>
             </div>
@@ -185,29 +185,29 @@ export default function SessionsPage() {
                                 </div>
 
                                 {/* Actions */}
-                                <div className="flex flex-col gap-1.5 pt-1">
+                                <div className="flex flex-col gap-3 pt-1">
                                     {/* Row 1: Xem + Sửa + Xóa */}
-                                    <div className="flex gap-1">
+                                    <div className="flex gap-1.5">
                                         <Link
                                             to={`/sessions/${s.id}`}
-                                            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 text-xs font-medium transition-colors"
+                                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 active:bg-gray-200 text-gray-600 text-sm font-medium transition-colors"
                                         >
-                                            <Eye className="w-3.5 h-3.5" /> Xem
+                                            <Eye className="w-4 h-4" /> Xem
                                         </Link>
                                         {s.status !== 'completed' && (
                                             <>
                                                 <Link
                                                     to={`/sessions/${s.id}/edit`}
-                                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-blue-600 text-xs font-medium transition-colors"
+                                                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 active:bg-gray-200 text-blue-600 text-sm font-medium transition-colors"
                                                 >
-                                                    <Pencil className="w-3.5 h-3.5" /> Sửa
+                                                    <Pencil className="w-4 h-4" /> Sửa
                                                 </Link>
                                                 <button
                                                     onClick={() => handleDelete(s.id, s.title)}
                                                     disabled={busy}
-                                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 text-xs font-medium transition-colors disabled:opacity-40"
+                                                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-500 text-sm font-medium transition-colors disabled:opacity-40"
                                                 >
-                                                    <Trash2 className="w-3.5 h-3.5" /> Xóa
+                                                    <Trash2 className="w-4 h-4" /> Xóa
                                                 </button>
                                             </>
                                         )}
@@ -215,15 +215,15 @@ export default function SessionsPage() {
 
                                     {/* Row 2: Status actions */}
                                     {nextActions.length > 0 && (
-                                        <div className="flex gap-1">
+                                        <div className="flex gap-1.5">
                                             {nextActions.map(({ label, next, to, cls }) => (
                                                 to ? (
-                                                    <Link key={to} to={`/sessions/${s.id}/${to}`} className={`flex-1 text-center py-1.5 rounded-lg text-xs font-medium transition-colors ${cls}`}>
+                                                    <Link key={to} to={`/sessions/${s.id}/${to}`} className={`flex-1 text-center py-2.5 rounded-lg text-sm font-medium transition-colors ${cls}`}>
                                                         {label}
                                                     </Link>
                                                 ) : (
                                                     <button key={next} onClick={() => handleStatusChange(s.id, next!)} disabled={busy}
-                                                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${cls}`}>
+                                                        className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 ${cls}`}>
                                                         {label}
                                                     </button>
                                                 )
@@ -247,16 +247,16 @@ export default function SessionsPage() {
                         <button
                             onClick={() => setQuery(q => ({ ...q, page: q.page - 1 }))}
                             disabled={meta.page <= 1}
-                            className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                            className="p-2.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 active:bg-gray-100"
                         >
-                            <ChevronLeft className="w-4 h-4" />
+                            <ChevronLeft className="w-5 h-5" />
                         </button>
                         <button
                             onClick={() => setQuery(q => ({ ...q, page: q.page + 1 }))}
                             disabled={meta.page >= meta.total_pages}
-                            className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                            className="p-2.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 active:bg-gray-100"
                         >
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
@@ -264,25 +264,3 @@ export default function SessionsPage() {
         </div>
     );
 }
-
-
-
-// open/full
-//    ↓
-// Kết thúc
-//    ↓
-// SessionFinishPage
-//    ↓
-// Gửi bill
-//    ↓
-// waiting_payment
-//    ↓
-// Member chuyển khoản
-//    ↓
-// Admin xác nhận từng bill
-//    ↓
-// paid (từng registration)
-//    ↓
-// Tất cả member đã paid
-//    ↓
-// completed
