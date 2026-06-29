@@ -105,17 +105,6 @@ export default function SessionDetailPage() {
         return () => clearTimeout(t);
     }, [search, showAddModal]);
 
-    // const handleConfirm = async (regId: string) => {
-    //     setActionId(regId);
-    //     try {
-    //         await registrationsApi.confirm(regId);
-    //         toast.success('Xác nhận thành công — đã cộng 1 cầu lông!');
-    //         refreshSilently();
-    //     } finally {
-    //         setActionId(null);
-    //     }
-    // };
-
     const handleConfirm = (regId: string) =>
         runAction(
             `${regId}:confirm`, regId,
@@ -123,18 +112,6 @@ export default function SessionDetailPage() {
             'Xác nhận thành công — đã cộng 1 cầu lông!',
             'Xác nhận thất bại',
         );
-
-    // const handleReject = async (regId: string) => {
-    //     setActionId(regId);
-    //     try {
-    //         await registrationsApi.reject(regId, rejectNotes[regId]);
-    //         toast.success('Đã từ chối');
-    //         setShowReject(null);
-    //         refreshSilently();
-    //     } finally {
-    //         setActionId(null);
-    //     }
-    // };
 
     const handleReject = (regId: string) =>
         runAction(
@@ -145,19 +122,6 @@ export default function SessionDetailPage() {
             () => setShowReject(null),
         );
 
-    // const handleCheckinPresent = async (regId: string) => {
-    //     setActionId(regId);
-    //     try {
-    //         await registrationsApi.checkinPresent(regId);
-    //         toast.success('Đã điểm danh có mặt');
-    //         refreshSilently();
-    //     } catch (err: any) {
-    //         toast.error(err?.response?.data?.message ?? 'Điểm danh thất bại');
-    //     } finally {
-    //         setActionId(null);
-    //     }
-    // };
-
     const handleCheckinPresent = (regId: string) =>
         runAction(
             `${regId}:present`, regId,
@@ -165,20 +129,6 @@ export default function SessionDetailPage() {
             'Đã điểm danh có mặt',
             'Điểm danh thất bại',
         );
-
-    // const handleCheckinAbsent = async (regId: string, displayName: string) => {
-    //     if (!confirm(`Đánh dấu vắng mặt và xoá ${displayName} khỏi buổi này?`)) return;
-    //     setActionId(regId);
-    //     try {
-    //         await registrationsApi.checkinAbsent(regId);
-    //         toast.success('Đã đánh dấu vắng mặt');
-    //         refreshSilently();
-    //     } catch (err: any) {
-    //         toast.error(err?.response?.data?.message ?? 'Thao tác thất bại');
-    //     } finally {
-    //         setActionId(null);
-    //     }
-    // };
 
 
     const handleCheckinAbsent = (regId: string, displayName: string) => {
@@ -283,26 +233,30 @@ export default function SessionDetailPage() {
 
     if (!session) return null;
 
-    const effectivePaymentStatus = (r: any) => {
-        if (r.host_registration_id) {
-            const host = registrations.find(h => h.id === r.host_registration_id);
-            return host ? { payment_status: host.payment_status, payment_reference: host.payment_reference } : r;
-        }
-        return r;
-    };
 
-    const pending = registrations.filter(r => {
-        const eff = effectivePaymentStatus(r);
-        return eff.payment_status === 'pending' &&
-            r.participation_status !== 'awaiting_checkin' &&
-            !eff.payment_reference;
-    });
-    const pendingReview = registrations.filter(r => {
-        const eff = effectivePaymentStatus(r);
-        return eff.payment_status === 'pending' && Boolean(eff.payment_reference);
-    });
-    const confirmed = registrations.filter(r => effectivePaymentStatus(r).payment_status === 'confirmed');
-    const rejected = registrations.filter(r => effectivePaymentStatus(r).payment_status === 'rejected');
+    const allPaid = registrations
+        .filter(r => r.participation_status === 'confirmed')
+        .every(r => r.payment_status === 'confirmed');
+
+    const canComplete = session.status === 'waiting_payment' && allPaid && registrations.filter(r => r.participation_status === 'confirmed').length > 0;
+
+    const pending = registrations.filter(r =>
+        r.payment_status === 'pending' &&
+        r.participation_status !== 'awaiting_checkin' &&
+        !r.payment_reference &&
+        r.payment_method !== 'cash'
+    );
+
+    const pendingReview = registrations.filter(r =>
+        r.payment_status === 'pending' && (
+            Boolean(r.payment_reference) ||
+            r.payment_method === 'cash' ||
+            (r.is_guest && r.amount_override != null && r.payment_method !== 'grouped_with_host')
+        )
+    );
+
+    const confirmed = registrations.filter(r => r.payment_status === 'confirmed');
+    const rejected = registrations.filter(r => r.payment_status === 'rejected');
     const awaitingCheckin = registrations.filter(r => r.participation_status === 'awaiting_checkin');
 
     const hostRegs = registrations.filter(r => !r.host_registration_id);
@@ -314,17 +268,18 @@ export default function SessionDetailPage() {
     const canAddMember = session.status === 'open' || session.status === 'full';
 
     const renderRow = (reg: any, isNested = false) => {
-        const hostReg = reg.host_registration_id
-            ? registrations.find(r => r.id === reg.host_registration_id)
-            : null;
-        const effectiveReg = hostReg ?? reg;
 
-        const isPendingReview = effectiveReg.payment_status === 'pending' && Boolean(effectiveReg.payment_reference);
+        const isPendingReview = reg.payment_status === 'pending' && (
+            Boolean(reg.payment_reference) ||
+            reg.payment_method === 'cash' ||
+            (reg.is_guest && reg.amount_override != null && reg.payment_method !== 'grouped_with_host')
+        );
+
         const cfg = reg.participation_status === 'awaiting_checkin'
             ? STATUS_CONFIG.awaitingCheckin
             : isPendingReview
                 ? STATUS_CONFIG.pendingReview
-                : (STATUS_CONFIG[effectiveReg.payment_status] ?? STATUS_CONFIG.pending);
+                : (STATUS_CONFIG[reg.payment_status] ?? STATUS_CONFIG.pending);
         const StatusIcon = cfg.icon;
         const busy = actionId === reg.id;
         const user = reg.users;
@@ -332,67 +287,15 @@ export default function SessionDetailPage() {
         const displayGender = user?.gender ?? reg.guest_gender;
 
         const canReviewPayment =
-            Boolean(reg.payment_reference) || (reg.is_guest && !reg.host_registration_id);
-
+            Boolean(reg.payment_reference) ||
+            reg.payment_method === 'cash' ||
+            (reg.is_guest && reg.amount_override != null
+                && reg.payment_method !== 'grouped_with_host'
+                && reg.participation_status === 'confirmed');
 
         const presentPhase = getPhase(`${reg.id}:present`);
         const absentPhase = getPhase(`${reg.id}:absent`);
         const confirmPhase = getPhase(`${reg.id}:confirm`);
-
-        // const actionsNode = reg.participation_status === 'awaiting_checkin' ? (
-        //     <>
-        //         <button
-        //             onClick={() => handleCheckinPresent(reg.id)}
-        //             disabled={busy}
-        //             className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-        //         >
-        //             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-        //             Có mặt
-        //         </button>
-        //         <button
-        //             onClick={() => handleCheckinAbsent(reg.id, displayName)}
-        //             disabled={busy}
-        //             className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-100 hover:bg-red-200 text-red-600 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-        //         >
-        //             <UserX className="w-4 h-4" />
-        //             Vắng mặt
-        //         </button>
-        //     </>
-        // ) : (reg.payment_proof_url || (reg.payment_status === 'pending' && canReviewPayment)) ? (
-        //     <>
-        //         {reg.payment_proof_url && (
-        //             <button
-        //                 onClick={() => setViewingBillUrl(reg.payment_proof_url)}
-        //                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-        //                 title="Xem ảnh bill chuyển khoản"
-        //             >
-        //                 <Eye className="w-4 h-4" />
-        //             </button>
-        //         )}
-
-        //         {reg.payment_status === 'pending' && canReviewPayment && (
-        //             <>
-        //                 <button
-        //                     onClick={() => handleConfirm(reg.id)}
-        //                     disabled={busy}
-        //                     className="flex items-center gap-1.5 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-        //                 >
-        //                     <CheckCircle2 className="w-4 h-4" />
-        //                     Xác nhận
-        //                 </button>
-        //                 <button
-        //                     onClick={() => setShowReject(showReject === reg.id ? null : reg.id)}
-        //                     disabled={busy}
-        //                     className="flex items-center gap-1.5 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-600 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-        //                 >
-        //                     <XCircle className="w-4 h-4" />
-        //                     Từ chối
-        //                 </button>
-        //             </>
-        //         )}
-        //     </>
-        // ) : null;
-
 
 
         const actionsNode = reg.participation_status === 'awaiting_checkin' ? (
@@ -489,6 +392,15 @@ export default function SessionDetailPage() {
                                     </span>
                                 )}
 
+                                {/* Guest đi cùng host có amount nhưng chưa có payment_method */}
+                                {reg.is_guest && reg.host_registration_id && reg.amount_override != null
+                                    && reg.payment_method !== 'grouped_with_host' && reg.payment_status === 'pending'
+                                    && reg.payment_method !== 'cash' && (
+                                        <span className="text-xs px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                            💵 Tiền mặt
+                                        </span>
+                                    )}
+
                                 <span className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 whitespace-nowrap ${cfg.cls}`}>
                                     <StatusIcon className="w-3 h-3" />
                                     {cfg.label}
@@ -540,26 +452,6 @@ export default function SessionDetailPage() {
                     )}
                 </div>
 
-                {/* Reject reason input */}
-                {/* {showReject === reg.id && (
-                    <div className={`${isNested ? 'pl-9 pr-4' : 'px-4'} pb-3 flex gap-2`}>
-                        <input
-                            type="text"
-                            value={rejectNotes[reg.id] ?? ''}
-                            onChange={e => setRejectNotes(n => ({ ...n, [reg.id]: e.target.value }))}
-                            className="input-field text-sm flex-1"
-                            placeholder="Lý do từ chối (tuỳ chọn)"
-                        />
-                        <button
-                            onClick={() => handleReject(reg.id)}
-                            disabled={busy}
-                            className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg disabled:opacity-50"
-                        >
-                            Xác nhận từ chối
-                        </button>
-                    </div>
-                )} */}
-
                 {showReject === reg.id && (
                     <div className={`${isNested ? 'pl-9 pr-4' : 'px-4'} pb-3 flex gap-2`}>
                         <input
@@ -603,6 +495,7 @@ export default function SessionDetailPage() {
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <h1 className="text-xl font-bold text-gray-900 flex-1 min-w-[100px] truncate">{session.title}</h1>
+
                     {canAddMember && awaitingCheckin.length > 0 && (
                         <span className="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg flex-shrink-0">
                             Còn {awaitingCheckin.length} người chưa điểm danh
@@ -611,10 +504,31 @@ export default function SessionDetailPage() {
                     {canAddMember && awaitingCheckin.length === 0 && (
                         <Link
                             to={`/sessions/${id}/finish`}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors flex-shrink-0"                  >
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors flex-shrink-0"
+                        >
                             <Calculator className="w-4 h-4" /> Kết thúc
                         </Link>
                     )}
+
+                    {/* ← THÊM VÀO ĐÂY */}
+                    {canComplete && (
+                        <button
+                            onClick={async () => {
+                                if (!confirm('Xác nhận hoàn thành buổi đánh? Buổi sẽ bị khoá lại.')) return;
+                                try {
+                                    await sessionsApi.updateStatus(id!, { status: 'completed' });
+                                    toast.success('Đã hoàn thành và khoá buổi đánh!');
+                                    refreshSilently();
+                                } catch (err: any) {
+                                    toast.error(err?.response?.data?.message ?? 'Thất bại');
+                                }
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors flex-shrink-0"
+                        >
+                            <CheckCircle2 className="w-4 h-4" /> Hoàn thành
+                        </button>
+                    )}
+
                     {canAddMember && (
                         <button
                             onClick={() => setShowAddModal(true)}

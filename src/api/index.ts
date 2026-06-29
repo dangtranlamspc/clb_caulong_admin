@@ -67,7 +67,8 @@ export const sessionsApi = {
   get: (id: string) => api.get(`/sessions/${id}`),
   create: (data: any) => api.post('/sessions', data),
   update: (id: string, data: any) => api.put(`/sessions/${id}`, data),
-  updateStatus: (id: string, status: string) => api.patch(`/sessions/${id}/status`, { status }),
+  updateStatus: (id: string, data: { status: string }) =>
+    api.patch(`/sessions/${id}/status`, data),
   delete: (id: string) => api.delete(`/sessions/${id}`),
   getRegistrations: (id: string) => api.get(`/sessions/${id}/registrations`),
   getCost: (id: string) => api.get(`/sessions/${id}/cost`),

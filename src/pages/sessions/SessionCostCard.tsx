@@ -93,12 +93,6 @@ export default function SessionCostCard({ sessionId }: Props) {
                                     </div>
                                     <span className="font-medium text-blue-600 flex-shrink-0">{fmt(p.total_amount)}</span>
                                 </div>
-                                {p.guest_names.length > 0 && (
-                                    <div className="pl-4 mt-0.5 text-xs text-gray-400">
-                                        + khách đi cùng: {p.guest_names.join(', ')}
-                                        {p.guests_amount > 0 ? ` (${fmt(p.guests_amount)})` : ' (đã gộp tiền)'}
-                                    </div>
-                                )}
                             </div>
                         ))}
                     </div>
