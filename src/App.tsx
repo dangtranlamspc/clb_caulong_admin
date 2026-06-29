@@ -14,6 +14,7 @@ import LeaderboardPage from './pages/leaderboard/LeaderboardPage';
 import MatchesAdminPage from './pages/matches/MatchesAdminPage';
 import WinRateLeaderboardPage from './pages/rankings/WinRateLeaderboardPage';
 import SessionFinishPage from './pages/sessions/SessionFinishPage';
+import WalletAdminPage from './pages/wallets/WalletAdminPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -48,6 +49,8 @@ export default function App() {
         <Route path="/rankings/win-rate" element={<ProtectedRoute><WinRateLeaderboardPage /></ProtectedRoute>} />
 
         <Route path='/sessions/:id/finish' element={<ProtectedRoute><SessionFinishPage /></ProtectedRoute>} />
+
+        <Route path='/wallets' element={<ProtectedRoute><WalletAdminPage /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

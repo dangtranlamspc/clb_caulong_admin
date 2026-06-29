@@ -17,6 +17,7 @@ const navItems = [
   { label: 'Trận giao hữu', path: '/matches', icon: Swords },
   { label: 'Bảng xếp hạng level', path: '/leaderboard', icon: Trophy },
   { label: 'Rank', path: '/rankings/win-rate', icon: TrendingUp },
+  { label: 'Ví', path: '/wallets', icon: TrendingUp },
   // { label: 'Báo cáo', path: '/reports', icon: TrendingUp },
   // { label: 'Báo cáo guest', path: '/sessions/guest', icon: TrendingUp },
 ];
