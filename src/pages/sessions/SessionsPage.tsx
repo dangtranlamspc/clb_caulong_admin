@@ -63,7 +63,7 @@ export default function SessionsPage() {
     const handleStatusChange = async (id: string, next: string) => {
         setActionId(id);
         try {
-            await sessionsApi.updateStatus(id, next);
+            await sessionsApi.updateStatus(id, { status: next });
             toast.success('Đã cập nhật trạng thái');
             fetch();
         } finally {
