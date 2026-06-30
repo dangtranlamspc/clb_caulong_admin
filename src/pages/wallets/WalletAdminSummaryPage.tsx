@@ -45,6 +45,21 @@ function RankTag({ tier, points }: { tier: string | null; points?: number }) {
     );
 }
 
+function formatThousands(value: string, allowNegative: boolean) {
+    const isNegative = allowNegative && value.trim().startsWith('-');
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return isNegative ? '-' : '';
+    const formatted = Number(digits).toLocaleString('vi-VN');
+    return isNegative ? `-${formatted}` : formatted;
+}
+
+function parseThousands(value: string) {
+    const isNegative = value.trim().startsWith('-');
+    const digits = value.replace(/\D/g, '');
+    const num = digits ? Number(digits) : 0;
+    return isNegative ? -num : num;
+}
+
 function StatusBadge({ balance }: { balance: number }) {
     if (balance < 0)
         return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">Âm ví</span>;
@@ -55,14 +70,20 @@ function StatusBadge({ balance }: { balance: number }) {
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 whitespace-nowrap">Bình thường</span>;
 }
 
-function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () => void; onChanged: () => void }) {
+function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () => void; onChanged: (newBalance?: number) => void }) {
     const [showTopup, setShowTopup] = useState(false);
     const [showAdjust, setShowAdjust] = useState(false);
-    const [amount, setAmount] = useState('');
+    const [amountDisplay, setAmountDisplay] = useState('');
     const [note, setNote] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [loadingTx, setLoadingTx] = useState(true);
+
+    const amount = parseThousands(amountDisplay);
+
+    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setAmountDisplay(formatThousands(e.target.value, showAdjust));
+    };
 
     const fetchTx = useCallback(async () => {
         setLoadingTx(true);
@@ -77,19 +98,17 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
     useEffect(() => { fetchTx(); }, [fetchTx]);
 
     const handleSubmit = async (isTopup: boolean) => {
-        const val = Number(amount);
-        if (!val || (isTopup && val < 1000)) { toast.error('Số tiền không hợp lệ'); return; }
+        if (!amount || (isTopup && amount < 1000)) { toast.error('Số tiền không hợp lệ'); return; }
         setSubmitting(true);
         try {
-            if (isTopup) {
-                await walletAdminApi.manualTopup(member.id, val, note || undefined);
-            } else {
-                await walletAdminApi.manualAdjust(member.id, val, note || undefined);
-            }
+            const { data } = isTopup
+                ? await walletAdminApi.manualTopup(member.id, amount, note || undefined)
+                : await walletAdminApi.manualAdjust(member.id, amount, note || undefined);
+
             toast.success('Đã cập nhật số dư');
-            setShowTopup(false); setShowAdjust(false); setAmount(''); setNote('');
+            setShowTopup(false); setShowAdjust(false); setAmountDisplay(''); setNote('');
             fetchTx();
-            onChanged();
+            onChanged(data.new_balance);
         } catch (err: any) {
             toast.error(err?.response?.data?.message ?? 'Thất bại');
         } finally {
@@ -138,14 +157,27 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
                     <p className="text-xs font-semibold text-blue-800 mb-2">
                         {showTopup ? 'Nạp tiền thủ công' : 'Điều chỉnh số dư (có thể nhập số âm)'}
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
-                            placeholder="Số tiền" className="flex-1 px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
-                        <input value={note} onChange={e => setNote(e.target.value)}
-                            placeholder="Ghi chú" className="flex-1 px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white" />
-                        <button onClick={() => handleSubmit(showTopup)} disabled={submitting}
-                            className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg disabled:opacity-50 flex items-center justify-center gap-1">
-                            {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'OK'}
+                    <div className="flex flex-col gap-2">
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            value={amountDisplay}
+                            onChange={handleAmountChange}
+                            placeholder="Số tiền"
+                            className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
+                        />
+                        <input
+                            value={note}
+                            onChange={e => setNote(e.target.value)}
+                            placeholder="Ghi chú"
+                            className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
+                        />
+                        <button
+                            onClick={() => handleSubmit(showTopup)}
+                            disabled={submitting}
+                            className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        >
+                            {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Xác nhận'}
                         </button>
                     </div>
                 </div>
@@ -392,19 +424,12 @@ export default function WalletAdminSummaryPage() {
                         </div>
                     </div>
 
-                    {/* ── Panel chi tiết: full-width overlay trên mobile, panel cố định bên phải trên desktop ── */}
                     {selectedMember && (
                         <>
-                            {/* Lớp phủ nền tối, chỉ hiện trên mobile/tablet để tap ra ngoài đóng panel */}
-                            <div
-                                className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-                                onClick={() => setSelectedMember(null)}
-                            />
-                            <div
-                                className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] rounded-t-2xl overflow-hidden flex flex-col
-                                           lg:static lg:z-auto lg:w-[420px] lg:flex-shrink-0 lg:rounded-xl lg:max-h-[calc(100vh-200px)]
-                                           bg-white shadow-sm border border-gray-100"
-                            >
+                            <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSelectedMember(null)} />
+                            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] rounded-t-2xl overflow-hidden flex flex-col
+                       lg:static lg:z-auto lg:w-[420px] lg:flex-shrink-0 lg:rounded-xl lg:max-h-[calc(100vh-200px)]
+                       bg-white shadow-sm border border-gray-100">
                                 <div className="lg:hidden flex justify-center pt-2 pb-1 flex-shrink-0">
                                     <span className="w-10 h-1 rounded-full bg-gray-200" />
                                 </div>
@@ -412,7 +437,13 @@ export default function WalletAdminSummaryPage() {
                                     <MemberPanel
                                         member={selectedMember}
                                         onClose={() => setSelectedMember(null)}
-                                        onChanged={() => { fetchMembers(); fetchSummary(); }}
+                                        onChanged={(newBalance) => {
+                                            if (typeof newBalance === 'number') {
+                                                setSelectedMember((prev: any) => prev ? { ...prev, balance: newBalance } : prev);
+                                            }
+                                            fetchMembers();
+                                            fetchSummary();
+                                        }}
                                     />
                                 </div>
                             </div>
