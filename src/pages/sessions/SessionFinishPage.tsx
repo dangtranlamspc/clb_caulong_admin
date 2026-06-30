@@ -61,16 +61,24 @@ export default function SessionFinishPage() {
                 hosts.forEach((h: any) => {
                     const hostGender = h.is_guest ? h.guest_gender : h.users?.gender;
                     const hostDefault = hostGender === 'female' ? priceFemale : priceMale;
-                    initAmounts[h.id] = h.amount_override ?? hostDefault;
+                    // Ưu tiên base_amount đã lưu (nếu buổi từng được tính trước đó), fallback amount_override, rồi giá mặc định
+                    initAmounts[h.id] = h.base_amount ?? h.amount_override ?? hostDefault;
                 });
                 setAmounts(initAmounts);
 
                 const initGuestAmounts: Record<string, number> = {};
                 guests.forEach((g: any) => {
                     const gGender = g.guest_gender;
-                    initGuestAmounts[g.id] = gGender === 'female' ? priceFemale : priceMale;
+                    initGuestAmounts[g.id] = g.base_amount ?? (gGender === 'female' ? priceFemale : priceMale);
                 });
                 setGuestAmounts(initGuestAmounts);
+
+                // Khôi phục lại các khoản khác riêng từng nhập trước đó (nếu có)
+                const initOtherFees: Record<string, number> = {};
+                confirmed.forEach((reg: any) => {
+                    if (reg.other_fee_amount) initOtherFees[reg.id] = reg.other_fee_amount;
+                });
+                setOtherFees(initOtherFees);
             })
             .finally(() => setLoading(false));
     }, [id]);
@@ -149,15 +157,27 @@ export default function SessionFinishPage() {
     const handleSubmit = async () => {
         setSubmitting(true);
         try {
-            const allAmounts: { registration_id: string; amount: number }[] = [];
+            const allAmounts: { registration_id: string; amount: number; base_amount: number; other_fee_amount: number }[] = [];
 
             hostRows.forEach(h => {
-                const hostAmt = (Number(amounts[h.id]) || 0) + (Number(otherFees[h.id]) || 0);
-                allAmounts.push({ registration_id: h.id, amount: hostAmt });
+                const base = Number(amounts[h.id]) || 0;
+                const other = Number(otherFees[h.id]) || 0;
+                allAmounts.push({
+                    registration_id: h.id,
+                    amount: base + other,
+                    base_amount: base,
+                    other_fee_amount: other,
+                });
 
                 guestsOf(h.id).forEach(g => {
-                    const guestAmt = (Number(guestAmounts[g.id]) || 0) + (Number(otherFees[g.id]) || 0);
-                    allAmounts.push({ registration_id: g.id, amount: guestAmt });
+                    const gBase = Number(guestAmounts[g.id]) || 0;
+                    const gOther = Number(otherFees[g.id]) || 0;
+                    allAmounts.push({
+                        registration_id: g.id,
+                        amount: gBase + gOther,
+                        base_amount: gBase,
+                        other_fee_amount: gOther,
+                    });
                 });
             });
 

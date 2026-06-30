@@ -250,8 +250,7 @@ export default function SessionDetailPage() {
     const pendingReview = registrations.filter(r =>
         r.payment_status === 'pending' && (
             Boolean(r.payment_reference) ||
-            r.payment_method === 'cash' ||
-            (r.is_guest && r.amount_override != null && r.payment_method !== 'grouped_with_host')
+            (r.payment_method === 'cash' && r.amount_override != null)
         )
     );
 
@@ -267,12 +266,21 @@ export default function SessionDetailPage() {
 
     const canAddMember = session.status === 'open' || session.status === 'full';
 
+    // Số tiền hiển thị cho mỗi đăng ký: giá do admin nhập riêng (amount_override) = phần
+    // tiền sân + tiền cầu của người đó, không còn fallback theo giá nam/nữ mặc định.
+    const formatVnd = (n: number) => Math.round(n ?? 0).toLocaleString('vi-VN') + 'đ';
+    const getRegAmount = (reg: any) => reg.amount_override;
+
+    // Số tiền cuối cùng mỗi người phải trả = chính amount_override (đã được tính sẵn ở màn
+    // "Kết thúc buổi": phần sân+cầu của người đó + khoản khác riêng của người đó, nếu có —
+    // xem SessionFinishPage.handleSubmit). KHÔNG cộng thêm session.other_fee ở đây vì sẽ
+    // bị tính trùng — nó đã nằm trong amount_override rồi.
+
     const renderRow = (reg: any, isNested = false) => {
 
         const isPendingReview = reg.payment_status === 'pending' && (
             Boolean(reg.payment_reference) ||
-            reg.payment_method === 'cash' ||
-            (reg.is_guest && reg.amount_override != null && reg.payment_method !== 'grouped_with_host')
+            (reg.payment_method === 'cash' && reg.amount_override != null)
         );
 
         const cfg = reg.participation_status === 'awaiting_checkin'
@@ -285,13 +293,11 @@ export default function SessionDetailPage() {
         const user = reg.users;
         const displayName = user?.full_name ?? reg.guest_full_name ?? '?';
         const displayGender = user?.gender ?? reg.guest_gender;
+        const regAmount = getRegAmount(reg);
 
         const canReviewPayment =
             Boolean(reg.payment_reference) ||
-            reg.payment_method === 'cash' ||
-            (reg.is_guest && reg.amount_override != null
-                && reg.payment_method !== 'grouped_with_host'
-                && reg.participation_status === 'confirmed');
+            (reg.payment_method === 'cash' && reg.amount_override != null);
 
         const presentPhase = getPhase(`${reg.id}:present`);
         const absentPhase = getPhase(`${reg.id}:absent`);
@@ -392,14 +398,8 @@ export default function SessionDetailPage() {
                                     </span>
                                 )}
 
-                                {/* Guest đi cùng host có amount nhưng chưa có payment_method */}
-                                {reg.is_guest && reg.host_registration_id && reg.amount_override != null
-                                    && reg.payment_method !== 'grouped_with_host' && reg.payment_status === 'pending'
-                                    && reg.payment_method !== 'cash' && (
-                                        <span className="text-xs px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
-                                            💵 Tiền mặt
-                                        </span>
-                                    )}
+                                {/* Guest đi cùng host (host_registration_id) chỉ hiện "Tiền mặt" khi host
+                                    đã chọn thanh toán solo cho khách đó (payment_method === 'cash' đã set ở trên) */}
 
                                 <span className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 whitespace-nowrap ${cfg.cls}`}>
                                     <StatusIcon className="w-3 h-3" />
@@ -410,6 +410,19 @@ export default function SessionDetailPage() {
                                     <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
                                         🏸 Đã cộng điểm
                                     </span>
+                                )}
+
+                                {/* Số tiền cần trả: amount_override đã là tổng cuối cùng (sân+cầu + khoản khác riêng nếu có) */}
+                                {reg.payment_method !== 'grouped_with_host' && (
+                                    regAmount != null ? (
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium whitespace-nowrap">
+                                            💰 {formatVnd(regAmount)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-400 italic whitespace-nowrap">
+                                            Chưa có giá
+                                        </span>
+                                    )
                                 )}
                             </div>
 
