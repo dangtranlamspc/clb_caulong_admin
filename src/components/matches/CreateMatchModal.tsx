@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { matchesApi } from "../../api";
 import { Loader2, XCircle } from "lucide-react";
 import { PlayerPickerField } from "./PlayerPickerField";
@@ -39,9 +40,9 @@ export function CreateMatchModal({ onClose, onCreated }: { onClose: () => void; 
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+    return createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                     <h3 className="font-bold text-gray-900">Tạo trận đấu hộ member</h3>
                     <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
@@ -96,6 +97,7 @@ export function CreateMatchModal({ onClose, onCreated }: { onClose: () => void; 
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

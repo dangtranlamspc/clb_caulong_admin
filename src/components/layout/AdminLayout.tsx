@@ -3,7 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Menu, X, LogOut,
   ChevronRight, Shield, Bell, User,
-  CalendarDays, ClipboardCheck, Trophy, Swords, TrendingUp
+  CalendarDays, ClipboardCheck, Trophy, Swords, TrendingUp,
+  ChevronDown,
+  Wallet
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authApi } from '../../api';
@@ -15,9 +17,16 @@ const navItems = [
   { label: 'Buổi đánh cầu', path: '/sessions', icon: CalendarDays },
   // { label: 'Xác nhận TT', path: '/registrations', icon: ClipboardCheck },
   { label: 'Trận giao hữu', path: '/matches', icon: Swords },
-  { label: 'Bảng xếp hạng level', path: '/leaderboard', icon: Trophy },
-  { label: 'Rank', path: '/rankings/win-rate', icon: TrendingUp },
-  { label: 'Ví', path: '/wallets', icon: TrendingUp },
+  // { label: 'Bảng xếp hạng level', path: '/leaderboard', icon: Trophy },
+  { label: 'BXH', path: '/rankings/win-rate', icon: Trophy },
+  {
+    label: 'Ví',
+    icon: Wallet,
+    children: [
+      { label: 'Duyệt nạp tiền', path: '/wallets/deposits' },
+      { label: 'Tổng hợp', path: '/wallets/summary' },
+    ],
+  },
   // { label: 'Báo cáo', path: '/reports', icon: TrendingUp },
   // { label: 'Báo cáo guest', path: '/sessions/guest', icon: TrendingUp },
 ];
@@ -27,6 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
   const handleLogout = async () => {
     try { await authApi.logout(); } catch { }
@@ -34,6 +44,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     toast.success('Đã đăng xuất');
     navigate('/login');
   };
+
+  const toggleMenu = (label: string) => {
+    setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  const isChildActive = (children?: { path: string }[]) =>
+    children?.some(c => location.pathname === c.path || location.pathname.startsWith(c.path)) ?? false;
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div className={`flex flex-col h-full ${mobile ? '' : 'w-64'}`}>
@@ -50,14 +67,67 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map(({ label, path, icon: Icon }) => {
+        {navItems.map((item) => {
+          const Icon = item.icon;
+
+          // ── Mục có submenu ──
+          if (item.children) {
+            const childActive = isChildActive(item.children);
+            const isOpen = openMenus[item.label] ?? childActive;
+
+            return (
+              <div key={item.label}>
+                <button
+                  onClick={() => toggleMenu(item.label)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${childActive
+                    ? 'bg-slate-700 text-white'
+                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                    }`}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {isOpen ? (
+                    <ChevronDown className="w-4 h-4 opacity-60" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 opacity-60" />
+                  )}
+                </button>
+
+                {isOpen && (
+                  <div className="mt-1 ml-4 pl-3 border-l border-slate-700 space-y-1">
+                    {item.children.map((child) => {
+                      const active =
+                        location.pathname === child.path ||
+                        location.pathname.startsWith(child.path);
+                      return (
+                        <Link
+                          key={child.path}
+                          to={child.path}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${active
+                            ? 'bg-blue-600 text-white font-medium'
+                            : 'text-slate-400 hover:bg-slate-700 hover:text-white'
+                            }`}
+                        >
+                          <span className="flex-1">{child.label}</span>
+                          {active && <ChevronRight className="w-3.5 h-3.5 opacity-60" />}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // ── Mục thường (không có submenu) ──
           const active =
-            location.pathname === path ||
-            (path !== '/' && location.pathname.startsWith(path));
+            location.pathname === item.path ||
+            (item.path !== '/' && location.pathname.startsWith(item.path!));
           return (
             <Link
-              key={path}
-              to={path}
+              key={item.path}
+              to={item.path!}
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active
                 ? 'bg-blue-600 text-white'
@@ -65,7 +135,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
-              <span className="flex-1">{label}</span>
+              <span className="flex-1">{item.label}</span>
               {active && <ChevronRight className="w-4 h-4 opacity-60" />}
             </Link>
           );

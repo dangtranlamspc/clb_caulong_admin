@@ -72,6 +72,8 @@ export default function MatchesAdminPage() {
     const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
     const [hiddenMap, setHiddenMap] = useState<Record<string, boolean>>({});
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showScoreInput, setShowScoreInput] = useState<string | null>(null);
+    const [scoreInputs, setScoreInputs] = useState<Record<string, { score_a: string; score_b: string }>>({});
 
     const fetchMatches = useCallback(async () => {
         setLoading(true);
@@ -95,15 +97,66 @@ export default function MatchesAdminPage() {
     useEffect(() => { fetchMatches(); }, [fetchMatches]);
     useEffect(() => { setPage(1); }, [activeTab]);
 
-    const handleApprove = async (id: string) => {
+    const handleApprove = async (id: string, scorePayload?: { score_a: number; score_b: number }) => {
         setActionId(id);
         try {
-            const { data } = await matchesApi.approve(id);
-            toast.success(`✅ Đã duyệt — cộng/trừ ${data.points_awarded} chai revice 🍾`);
+            const match = matches.find(m => m.id === id);
+            const nameById = new Map<string, string>();
+            if (match) {
+                [match.player_a1, match.player_a2, match.player_b1, match.player_b2]
+                    .filter(Boolean)
+                    .forEach((p: any) => nameById.set(p.id, p.full_name));
+            }
+
+            const { data } = await matchesApi.approve(id, scorePayload);
+
+            const updates = data.rank_updates ?? [];
+            const winners = updates.filter((u: any) => u.delta > 0);
+            const losers = updates.filter((u: any) => u.delta < 0);
+
+            const fmt = (u: any) => `${nameById.get(u.userId) ?? 'Người chơi'} ${u.delta > 0 ? '+' : ''}${u.delta}đ`;
+
+            if (winners.length > 0) {
+                toast.success(`🟢 Cộng điểm: ${winners.map(fmt).join(', ')}`);
+            }
+            if (losers.length > 0) {
+                toast.error(`🔴 Trừ điểm: ${losers.map(fmt).join(', ')}`);
+            }
+            if (winners.length === 0 && losers.length === 0) {
+                toast.success('✅ Đã duyệt trận đấu');
+            }
+
+            setShowScoreInput(null);
             fetchMatches();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message ?? 'Duyệt thất bại');
         } finally {
             setActionId(null);
         }
+    };
+
+    const handleApproveClick = (m: any) => {
+        if (m.status === 'pending_result') {
+            setShowScoreInput(m.id);
+            return;
+        }
+        handleApprove(m.id);
+    };
+
+    const handleConfirmScoreAndApprove = (id: string) => {
+        const input = scoreInputs[id];
+        const scoreA = parseInt(input?.score_a ?? '', 10);
+        const scoreB = parseInt(input?.score_b ?? '', 10);
+
+        if (isNaN(scoreA) || isNaN(scoreB)) {
+            toast.error('Vui lòng nhập đủ tỉ số 2 đội');
+            return;
+        }
+        if (scoreA === scoreB) {
+            toast.error('Tỉ số không được hoà');
+            return;
+        }
+        handleApprove(id, { score_a: scoreA, score_b: scoreB });
     };
 
     const handleReject = async (id: string) => {
@@ -122,13 +175,11 @@ export default function MatchesAdminPage() {
 
     const handleToggleHidden = async (id: string) => {
         const nextHidden = !hiddenMap[id];
-        // Optimistic update
         setHiddenMap(prev => ({ ...prev, [id]: nextHidden }));
         try {
             await api.patch(`/matches/${id}/visibility`, { is_hidden: nextHidden });
             toast.success(nextHidden ? '🙈 Đã ẩn khỏi member' : '👁 Đã hiện lại cho member');
         } catch {
-            // Rollback nếu lỗi
             setHiddenMap(prev => ({ ...prev, [id]: !nextHidden }));
             toast.error('Thao tác thất bại');
         }
@@ -185,7 +236,8 @@ export default function MatchesAdminPage() {
                 ) : (
                     matches.map((m) => {
                         const busy = actionId === m.id;
-                        const isPendingApproval = m.status === 'pending_approval';
+                        // Cho phép duyệt cả khi pending_result (admin tự nhập tỉ số) hoặc pending_approval (đã có tỉ số)
+                        const canApprove = m.status === 'pending_approval' || m.status === 'pending_result';
                         const isHidden = hiddenMap[m.id] ?? false;
 
                         const hasScore = (m.status === 'approved' || m.status === 'pending_approval') && m.sets?.length > 0;
@@ -258,7 +310,6 @@ export default function MatchesAdminPage() {
                                 {/* Row 2: Set scores + meta + actions */}
                                 <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-50">
                                     <div className="flex flex-col gap-1.5">
-                                        {/* <SetScores sets={m.sets} /> */}
                                         <div className="flex items-center gap-3 text-xs text-gray-400">
                                             <span className="flex items-center gap-1">
                                                 {m.match_type === 'doubles'
@@ -266,7 +317,6 @@ export default function MatchesAdminPage() {
                                                     : <><Trophy className="w-3 h-3" /> Đơn</>
                                                 }
                                             </span>
-                                            {/* <span>BO{m.best_of}</span> */}
                                             {m.played_at && (
                                                 <span>{format(new Date(m.played_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</span>
                                             )}
@@ -276,22 +326,25 @@ export default function MatchesAdminPage() {
                                     {/* Right-side actions */}
                                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
                                         {/* Approve / Reject buttons */}
-                                        {isPendingApproval && showReject !== m.id && (
+                                        {canApprove && showReject !== m.id && showScoreInput !== m.id && (
                                             <div className="flex gap-2">
                                                 <button
-                                                    onClick={() => handleApprove(m.id)}
+                                                    onClick={() => handleApproveClick(m)}
                                                     disabled={busy}
                                                     className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
                                                 >
-                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Duyệt
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    {m.status === 'pending_result' ? 'Nhập tỉ số & Duyệt' : 'Duyệt'}
                                                 </button>
-                                                <button
-                                                    onClick={() => setShowReject(m.id)}
-                                                    disabled={busy}
-                                                    className="flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                                >
-                                                    <XCircle className="w-3.5 h-3.5" /> Từ chối
-                                                </button>
+                                                {m.status === 'pending_approval' && (
+                                                    <button
+                                                        onClick={() => setShowReject(m.id)}
+                                                        disabled={busy}
+                                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                                    >
+                                                        <XCircle className="w-3.5 h-3.5" /> Từ chối
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
 
@@ -312,7 +365,7 @@ export default function MatchesAdminPage() {
                                             <p className="text-xs text-red-500 max-w-[160px] text-right">{m.reject_reason}</p>
                                         )}
 
-                                        {/* ── Nút ẩn/hiện (admin only) ── */}
+                                        {/* Nút ẩn/hiện (admin only) */}
                                         <button
                                             onClick={() => handleToggleHidden(m.id)}
                                             className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${isHidden
@@ -328,6 +381,49 @@ export default function MatchesAdminPage() {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* ── Input nhập tỉ số khi duyệt thẳng từ pending_result ── */}
+                                {showScoreInput === m.id && (
+                                    <div className="flex items-center gap-2 pt-1">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={scoreInputs[m.id]?.score_a ?? ''}
+                                            onChange={e => setScoreInputs(s => ({
+                                                ...s,
+                                                [m.id]: { ...s[m.id], score_a: e.target.value },
+                                            }))}
+                                            className="input-field text-sm w-20 text-center"
+                                            placeholder="Đội A"
+                                            autoFocus
+                                        />
+                                        <span className="text-gray-300">–</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={scoreInputs[m.id]?.score_b ?? ''}
+                                            onChange={e => setScoreInputs(s => ({
+                                                ...s,
+                                                [m.id]: { ...s[m.id], score_b: e.target.value },
+                                            }))}
+                                            className="input-field text-sm w-20 text-center"
+                                            placeholder="Đội B"
+                                        />
+                                        <button
+                                            onClick={() => handleConfirmScoreAndApprove(m.id)}
+                                            disabled={busy}
+                                            className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            Xác nhận duyệt
+                                        </button>
+                                        <button
+                                            onClick={() => setShowScoreInput(null)}
+                                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm rounded-lg"
+                                        >
+                                            Hủy
+                                        </button>
+                                    </div>
+                                )}
 
                                 {/* Reject input */}
                                 {showReject === m.id && (
@@ -364,7 +460,11 @@ export default function MatchesAdminPage() {
             {showCreateModal && (
                 <CreateMatchModal
                     onClose={() => setShowCreateModal(false)}
-                    onCreated={() => { setShowCreateModal(false); fetchMatches(); }}
+                    onCreated={() => {
+                        setShowCreateModal(false);
+                        setTab('pending_result');
+                        setPage(1);
+                    }}
                 />
             )}
 

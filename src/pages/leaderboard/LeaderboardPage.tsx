@@ -12,7 +12,6 @@ const LEVEL_LABELS: Record<string, string> = {
     chuyen_nghiep: 'Chuyên nghiệp',
 };
 
-// Ngưỡng phân loại vãng lai: >= 5 buổi đăng ký (đã xác nhận) -> Khách quen
 const VANG_LAI_THRESHOLD = 5;
 
 interface LeaderboardMember {
@@ -34,7 +33,7 @@ interface MemberBadge {
     emoji: string;
 }
 
-/** Tính badge hiển thị: Thành viên -> trình độ + Thường/VIP, Vãng lai -> Khách mới/Khách quen */
+
 function getMemberBadge(member: LeaderboardMember): MemberBadge | null {
     if (member.member_type === 'co_dinh') {
         const isVip = member.member_subtype === 'vip';

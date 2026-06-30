@@ -1,189 +1,172 @@
-import { useEffect, useState } from 'react';
-import { TrendingUp, RefreshCw, Swords, Trophy } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { RefreshCw, Trophy, Users, Crown, Calendar, ChevronDown } from 'lucide-react';
 import { rankingsApi } from '../../api';
 import { getTierConfig } from './rankConfig';
-import { RankIcon } from '../../components/RankIcon';
-import { RankPodiumAvatar } from '../../components/Rank';
 import { RankPodiumAvatarList } from '../../components/Rank_for_list';
 
-type Tab = 'winrate' | 'rank';
+const POINTS_PER_TIER = 50;
 
-const TOP3_STYLES = [
-    { bg: 'bg-yellow-50', avatarBg: 'bg-yellow-100', avatarText: 'text-yellow-700', border: 'border-yellow-300', medal: '🥇', label: 'text-yellow-600' },
-    { bg: 'bg-slate-50', avatarBg: 'bg-slate-100', avatarText: 'text-slate-600', border: 'border-slate-300', medal: '🥈', label: 'text-slate-500' },
-    { bg: 'bg-amber-50', avatarBg: 'bg-amber-100', avatarText: 'text-amber-700', border: 'border-amber-300', medal: '🥉', label: 'text-amber-700' },
-];
-
-function PositionBadge({ pos }: { pos: number }) {
-    const s = TOP3_STYLES[pos - 1];
-    if (s) return (
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold ${s.avatarBg} ${s.avatarText} border ${s.border}`}>
-            {s.medal}
-        </div>
-    );
+// ── Tam giác cân lên / xuống (thay cho icon Chevron) ──
+function TriangleUp({ className = '' }: { className?: string }) {
     return (
-        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold bg-gray-100 text-gray-500">
-            #{pos}
-        </div>
+        <span
+            className={`inline-block w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[9px] ${className}`}
+        />
     );
 }
 
-function WinRateBadge({ percent }: { percent: number }) {
-    const color = percent >= 70 ? 'bg-green-100 text-green-800'
-        : percent >= 50 ? 'bg-blue-100 text-blue-800'
-            : percent >= 30 ? 'bg-amber-100 text-amber-800'
-                : 'bg-red-100 text-red-800';
+function TriangleDown({ className = '' }: { className?: string }) {
     return (
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>
-            {percent.toFixed(1)}%
-        </span>
+        <span
+            className={`inline-block w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[9px] ${className}`}
+        />
     );
 }
 
-function WinRateBar({ percent }: { percent: number }) {
-    const color = percent >= 70 ? 'bg-green-500'
-        : percent >= 50 ? 'bg-blue-500'
-            : percent >= 30 ? 'bg-amber-400'
-                : 'bg-red-400';
-    return (
-        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${Math.min(percent, 100)}%` }} />
-        </div>
-    );
-}
+// ── Dropdown chọn tháng — tự dựng, có animation mở/đóng mượt ──
+function MonthDropdown({ options, value, onChange }: { options: Date[]; value: Date; onChange: (d: Date) => void }) {
+    const [open, setOpen] = useState(false);
+    const [mounted, setMounted] = useState(false); // điều khiển animation enter/exit
+    const wrapRef = useRef<HTMLDivElement>(null);
 
-function WinRatePodium({ top3 }: { top3: any[] }) {
-    const podiumOrder = [top3[1], top3[0], top3[2]];
-    const podiumStyles = [
-        { pt: 'pt-4', avatarSize: 'w-14 h-14 text-2xl', crown: false, valueClass: 'text-lg font-bold text-slate-600' },
-        { pt: 'pt-0', avatarSize: 'w-[72px] h-[72px] text-3xl', crown: true, valueClass: 'text-xl font-bold text-green-600' },
-        { pt: 'pt-6', avatarSize: 'w-12 h-12 text-xl', crown: false, valueClass: 'text-lg font-bold text-amber-700' },
-    ];
-    const medals = ['🥈', '🥇', '🥉'];
-    const positions = [2, 1, 3];
+    useEffect(() => {
+        if (open) {
+            setMounted(true);
+        } else if (mounted) {
+            const t = setTimeout(() => setMounted(false), 150);
+            return () => clearTimeout(t);
+        }
+    }, [open]);
+
+    useEffect(() => {
+        const onClickOutside = (e: MouseEvent) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
+    }, []);
+
+    const label = `Tháng ${value.getMonth() + 1}/${value.getFullYear()}`;
+    const labelShort = `T${value.getMonth() + 1}/${value.getFullYear()}`;
 
     return (
-        <div className="grid grid-cols-3 gap-3">
-            {podiumOrder.map((p, i) => {
-                if (!p) return <div key={i} />;
-                const style = podiumStyles[i];
-                const s = TOP3_STYLES[positions[i] - 1];
-                return (
-                    <div key={p.id} className={`flex flex-col items-center gap-2 ${style.pt}`}>
-                        <div className="relative">
-                            <div
-                                className={`${style.avatarSize} rounded-full overflow-hidden flex items-center justify-center font-bold shadow-inner border ${s.border} ${s.avatarBg} ${s.avatarText}`}
-                            >
-                                {p.avatar_url ? (
-                                    <img src={p.avatar_url} alt={p.full_name} className="w-full h-full object-cover" />
-                                ) : (
-                                    p.full_name?.[0]?.toUpperCase()
-                                )}
-                            </div>
-                            {style.crown && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">👑</div>}
-                        </div>
-                        <div className="text-center">
-                            <p className="text-sm font-semibold text-gray-800 truncate max-w-[160px]">{p.full_name}</p>
-                            <p className={`text-xs ${s.label}`}>{medals[i]} #{positions[i]}</p>
-                            <p className={style.valueClass}>{Number(p.win_rate_percent).toFixed(1)}%</p>
-                            <p className="text-xs text-gray-400">{p.sets_won_month}W / {p.sets_lost_month}L</p>
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
+        <div ref={wrapRef} className="relative flex-shrink-0">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                className="flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 whitespace-nowrap hover:bg-gray-100 hover:border-gray-300 transition-colors duration-200"
+            >
+                <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                <span className="hidden sm:inline">{label}</span>
+                <span className="sm:hidden">{labelShort}</span>
+                <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+            </button>
 
-// startPos: vị trí bắt đầu đếm (mặc định 4 vì top3 đã ở podium)
-function WinRateList({ data, startPos = 4 }: { data: any[]; startPos?: number }) {
-    return (
-        <div className="card !p-0 overflow-hidden">
-            <div className="divide-y divide-gray-100">
-                {data.map((member, idx) => {
-                    const pos = startPos + idx;
-                    const isTop3 = pos <= 3;
-                    const s = TOP3_STYLES[pos - 1];
-                    const winRate = Number(member.win_rate_percent);
-                    return (
-                        <div key={member.id} className={`flex items-center gap-3 px-4 py-3 ${isTop3 && s ? s.bg : 'hover:bg-gray-50'}`}>
-                            <PositionBadge pos={pos} />
-                            <div
-                                className={`w-9 h-9 rounded-full overflow-hidden flex items-center justify-center font-semibold text-sm flex-shrink-0 ${isTop3 && s
-                                    ? `${s.avatarBg} ${s.avatarText}`
-                                    : 'bg-green-100 text-green-700'
+            {mounted && (
+                <div
+                    className={`absolute right-0 mt-1.5 w-36 sm:w-40 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 origin-top-right transition-all duration-150 ease-out ${open ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-1 pointer-events-none'
+                        }`}
+                >
+                    {options.map((opt) => {
+                        const isActive = opt.getFullYear() === value.getFullYear() && opt.getMonth() === value.getMonth();
+                        return (
+                            <button
+                                key={`${opt.getFullYear()}-${opt.getMonth()}`}
+                                type="button"
+                                onClick={() => { onChange(opt); setOpen(false); }}
+                                className={`w-full text-left px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${isActive ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
                                     }`}
                             >
-                                {member.avatar_url ? (
-                                    <img src={member.avatar_url} alt={member.full_name} className="w-full h-full object-cover" />
-                                ) : (
-                                    member.full_name?.[0]?.toUpperCase()
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-800 truncate">{member.full_name}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <WinRateBar percent={winRate} />
-                                    <span className="text-xs text-gray-400 flex-shrink-0">{member.total_sets_month ?? 0} set</span>
-                                </div>
-                            </div>
-                            <div className="text-right flex-shrink-0 space-y-0.5">
-                                <div className="flex justify-end"><WinRateBadge percent={winRate} /></div>
-                                <p className="text-xs text-gray-400">
-                                    <span className="text-green-600 font-medium">{member.sets_won_month}W</span>
-                                    {' / '}
-                                    <span className="text-red-400 font-medium">{member.sets_lost_month}L</span>
-                                </p>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+                                Tháng {opt.getMonth() + 1}/{opt.getFullYear()}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
 
-function TierBadge({ tier, division, points }: { tier: string; division: string; points: number }) {
-    const cfg = getTierConfig(tier);
+function DeltaText({ delta, suffix }: { delta: number; suffix: string }) {
+    if (delta > 0) {
+        return (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                <TriangleUp className="border-b-emerald-600" />
+                {delta} {suffix}
+            </span>
+        );
+    }
+    if (delta < 0) {
+        return (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-500">
+                <TriangleDown className="border-t-red-500" />
+                {Math.abs(delta)} {suffix}
+            </span>
+        );
+    }
+    // delta === 0 (hoặc -0) → chỉ hiện dấu gạch ngang
+    return <span className="inline-flex items-center text-xs font-medium text-gray-400">-</span>;
+}
+
+function Avatar({ src, name, size = 40 }: { src?: string | null; name: string; size?: number }) {
+    const [err, setErr] = useState(false);
+    const show = src && !err;
     return (
-        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border}`}>
-            {tier} {division}
-        </span>
+        <div className="rounded-full overflow-hidden border border-gray-200 flex items-center justify-center bg-blue-100 text-blue-700 font-semibold flex-shrink-0" style={{ width: size, height: size }}>
+            {show ? <img src={src} alt={name} className="w-full h-full object-cover" onError={() => setErr(true)} /> : <span>{name?.[0]?.toUpperCase()}</span>}
+        </div>
     );
 }
 
-function RankPodium({ top3 }: { top3: any[] }) {
-    const podiumOrder = [top3[1], top3[0], top3[2]];
-    const iconSizes = [110, 140, 110];
-    const podiumPt = ['mt-8', 'mt-0', 'mt-12'];
-    const crowns = [false, true, false];
+const POS_BADGE_CLS: Record<number, string> = {
+    2: 'bg-blue-100 text-blue-700',
+    3: 'bg-orange-100 text-orange-700',
+};
+
+// ── 3 card top — bậc thang, #1 cao + vương miện ──
+function TopThree({ data, valueKey, valueSuffix, deltaKey, deltaSuffix, deltaLabel, renderSub }: {
+    data: any[];
+    valueKey: string;
+    valueSuffix: string;
+    deltaKey: string;
+    deltaSuffix: string;
+    deltaLabel: string;
+    renderSub?: (m: any) => React.ReactNode;
+}) {
+    const order = [data[1], data[0], data[2]];
     const positions = [2, 1, 3];
+    const liftClass = ['mt-4 sm:mt-6', 'mt-0', 'mt-4 sm:mt-6'];
 
     return (
-        <div className="grid grid-cols-3 gap-3">
-            {podiumOrder.map((p, i) => {
-                if (!p) return <div key={i} />;
-                const cfg = getTierConfig(p.tier);
-                const s = TOP3_STYLES[positions[i] - 1];
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 items-end">
+            {order.map((m, i) => {
+                const pos = positions[i];
+                if (!m) return <div key={i} />;
+                const isFirst = pos === 1;
                 return (
-                    <div key={p.id} className={`flex flex-col items-center ${podiumPt[i]}`} style={{ overflow: 'visible' }}>
-                        <div className="relative flex items-center justify-center pb-20" style={{ height: iconSizes[i], overflow: 'visible' }}>
-                            <RankPodiumAvatar
-                                tier={p.tier}
-                                avatar={p.avatar_url}
-                                name={p.full_name}
-                                size={iconSizes[i]}
-                                frameScale={i === 1 ? 3 : 2.7}
-                            />
-                            {crowns[i] && (
-                                <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-2xl">👑</div>
-                            )}
+                    <div
+                        key={m.id}
+                        className={`relative rounded-2xl p-2.5 sm:p-4 text-center ${liftClass[i]} ${isFirst ? 'bg-amber-50 border-2 border-amber-300 shadow-sm' : 'bg-gray-50 border border-gray-200'}`}
+                    >
+                        {isFirst ? (
+                            <Crown className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 fill-amber-300 absolute -top-3 sm:-top-4 left-1/2 -translate-x-1/2" />
+                        ) : (
+                            <span className={`absolute -top-2.5 sm:-top-3 left-2 sm:left-3 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold ${POS_BADGE_CLS[pos]}`}>
+                                {pos}
+                            </span>
+                        )}
+                        <div className="flex justify-center mb-1.5 sm:mb-2">
+                            <Avatar src={m.avatar_url} name={m.full_name} size={isFirst ? 56 : 44} />
                         </div>
-                        <div className="text-center">
-                            <p className="text-sm font-semibold text-gray-800 truncate max-w-[160px]">{p.full_name}</p>
-                            <p className={`text-xs ${s.label}`}>{s.medal} #{positions[i]}</p>
-                            <p className={`text-sm font-bold ${cfg.color}`}>{p.tier} {p.division}</p>
+                        <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{m.full_name}</p>
+                        {renderSub && <div className="mt-0.5">{renderSub(m)}</div>}
+                        <p className={`font-black mt-1 ${isFirst ? 'text-lg sm:text-2xl text-gray-900' : 'text-base sm:text-xl text-gray-800'}`}>
+                            {m[valueKey]} <span className="text-[10px] sm:text-xs font-medium text-gray-400">{valueSuffix}</span>
+                        </p>
+                        <div className="mt-1 flex justify-center">
+                            <DeltaText delta={m[deltaKey] ?? 0} suffix={deltaSuffix} />
                         </div>
+                        <p className="hidden sm:block text-[10px] text-gray-400 mt-0.5">{deltaLabel}</p>
                     </div>
                 );
             })}
@@ -191,67 +174,136 @@ function RankPodium({ top3 }: { top3: any[] }) {
     );
 }
 
-function RankList({ data, startPos = 4 }: { data: any[]; startPos?: number }) {
+// ── Bảng "Theo số buổi tham gia" ──
+function SessionTable({ data, prevMonthLabel }: { data: any[]; prevMonthLabel: string }) {
     return (
-        <div className="card !p-0 overflow-hidden">
-            <div className="divide-y divide-gray-100">
-                {data.map((p, idx) => {
-                    const pos = Number(p.rank_position);
-                    const isTop3 = pos <= 3;
-                    const s = TOP3_STYLES[pos - 1];
-                    const winRate = p.win_rate ? Number(p.win_rate).toFixed(1) : '0.0';
+        <div className="card !p-0 overflow-hidden overflow-x-auto">
+            <table className="w-full text-xs sm:text-sm">
+                <thead>
+                    <tr className="text-left text-[10px] sm:text-[11px] text-gray-400 border-b border-gray-100">
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium w-8 sm:w-10">#</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium">Thành viên</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-center whitespace-nowrap">Số buổi<br />tháng này</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-center">Tỷ lệ</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-right whitespace-nowrap">So với<br />{prevMonthLabel}</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                    {data.map((m, idx) => {
+                        const pos = idx + 4;
+                        const total = m.total_registrations ?? m.sessions_this_month ?? 0;
+                        const rate = total > 0 ? Math.min(100, (m.sessions_this_month / total) * 100) : 0;
+                        return (
+                            <tr key={m.id} className="hover:bg-gray-50">
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-gray-400 font-medium">{pos}</td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5">
+                                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                                        <Avatar src={m.avatar_url} name={m.full_name} size={28} />
+                                        <span className="font-medium text-gray-800 truncate">{m.full_name}</span>
+                                    </div>
+                                </td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-center font-semibold text-gray-700 whitespace-nowrap">{m.sessions_this_month} buổi</td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5">
+                                    <div className="flex items-center gap-1.5 sm:gap-2">
+                                        <div className="flex-1 h-2 sm:h-2.5 bg-gray-100 rounded-full overflow-hidden min-w-[40px] sm:min-w-[60px]">
+                                            <div
+                                                className="h-full rounded-full bg-emerald-500 transition-all duration-700 ease-out"
+                                                style={{ width: `${rate}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-[10px] sm:text-xs text-gray-500 flex-shrink-0">{rate.toFixed(0)}%</span>
+                                    </div>
+                                </td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right">
+                                    <DeltaText delta={m.sessions_delta ?? 0} suffix="" />
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    );
+}
 
-                    return (
-                        <div
-                            key={p.id}
-                            className={`flex items-center gap-3 px-4 py-4 ${isTop3 && s ? s.bg : 'hover:bg-gray-50'}`}
-                            style={{ minHeight: 64 }}
-                        >
-                            <PositionBadge pos={pos} />
-                            <RankPodiumAvatarList
-                                tier={p.tier}
-                                avatar={p.avatar_url}
-                                name={p.full_name}
-                                size={48}
-                                frameScale={3.2}
-                                listMode
-                            />
-                            <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-800 truncate">{p.full_name}</p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <TierBadge tier={p.tier} division={p.division} points={p.points} />
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                                <div className="text-right space-y-0.5">
-                                    <p className="text-xs text-gray-400">
-                                        <span className="text-green-600 font-medium">{p.wins}W</span>
-                                        <span className="mx-0.5">/</span>
-                                        <span className="text-red-400 font-medium">{p.losses}L</span>
-                                        <span className="ml-1">· {winRate}%</span>
-                                    </p>
-                                </div>
-                                <RankIcon tier={p.tier} size={56} />
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+// ── Bảng "Theo điểm leo rank" ──
+function RankTable({ data }: { data: any[] }) {
+    return (
+        <div className="card !p-0 overflow-hidden overflow-x-auto">
+            <table className="w-full text-xs sm:text-sm">
+                <thead>
+                    <tr className="text-left text-[10px] sm:text-[11px] text-gray-400 border-b border-gray-100">
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium w-8 sm:w-10">#</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium">Thành viên</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium">Rank</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-right">Điểm</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-right whitespace-nowrap">So với<br />tuần trước</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-right whitespace-nowrap">Tiến độ</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                    {data.map((p, idx) => {
+                        const pos = idx + 4;
+                        const cfg = getTierConfig(p.tier);
+                        const progressPct = Math.min(100, ((p.points ?? 0) / POINTS_PER_TIER) * 100);
+                        return (
+                            <tr key={p.id} className="hover:bg-gray-50">
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-gray-400 font-medium">{pos}</td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5">
+                                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                                        <Avatar src={p.avatar_url} name={p.full_name} size={28} />
+                                        <span className="font-medium text-gray-800 truncate">{p.full_name}</span>
+                                    </div>
+                                </td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5">
+                                    <span className={`inline-flex items-center gap-1 text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border whitespace-nowrap ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                                        💎 {p.tier}
+                                    </span>
+                                </td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-semibold text-gray-700">{p.total_points}</td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right">
+                                    <DeltaText delta={p.points_this_week ?? 0} suffix="" />
+                                </td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5">
+                                    <div className="flex items-center gap-1.5 sm:gap-2 justify-end">
+                                        <div className="flex-1 h-2 sm:h-2.5 bg-gray-100 rounded-full overflow-hidden min-w-[40px] sm:min-w-[70px]">
+                                            <div
+                                                className="h-full rounded-full bg-gradient-to-r from-violet-400 to-purple-600 transition-all duration-700 ease-out"
+                                                style={{ width: `${progressPct}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-[10px] sm:text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
+                                            {(p.points ?? 0)}/{POINTS_PER_TIER}
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
     );
 }
 
 export default function RankingsPage() {
-    const [tab, setTab] = useState<Tab>('winrate');
-    const [winRateData, setWinRateData] = useState<any[]>([]);
+    const [sessionData, setSessionData] = useState<any[]>([]);
     const [rankData, setRankData] = useState<any[]>([]);
-    const [loadingWR, setLoadingWR] = useState(true);
+    const [loadingSessions, setLoadingSessions] = useState(true);
     const [loadingRank, setLoadingRank] = useState(true);
 
-    const fetchWinRate = async () => {
-        setLoadingWR(true);
-        try { const { data } = await rankingsApi.winRate(); setWinRateData(data ?? []); }
-        finally { setLoadingWR(false); }
+    const today = new Date();
+    const [selectedMonth, setSelectedMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+
+    // Danh sách 12 tháng gần nhất để chọn (tháng hiện tại ở đầu)
+    const monthOptions = Array.from({ length: 12 }, (_, i) => new Date(today.getFullYear(), today.getMonth() - i, 1));
+
+    const fetchSessions = async (month: Date) => {
+        setLoadingSessions(true);
+        try {
+            const { data } = await rankingsApi.leaderboard({ month: month.getMonth() + 1, year: month.getFullYear() });
+            setSessionData(data ?? []);
+        } finally { setLoadingSessions(false); }
     };
 
     const fetchRank = async () => {
@@ -260,81 +312,113 @@ export default function RankingsPage() {
         finally { setLoadingRank(false); }
     };
 
-    useEffect(() => { fetchWinRate(); fetchRank(); }, []);
+    const refreshAll = () => { fetchSessions(selectedMonth); fetchRank(); };
+    useEffect(() => { refreshAll(); }, []);
+    useEffect(() => { fetchSessions(selectedMonth); }, [selectedMonth]);
 
-    const handleRefresh = () => tab === 'winrate' ? fetchWinRate() : fetchRank();
-    const loading = tab === 'winrate' ? loadingWR : loadingRank;
-    const top3WR = winRateData.slice(0, 3);
-    const top3Rank = rankData.slice(0, 3);
+    const sessionTop3 = sessionData.slice(0, 3);
+    const sessionRest = sessionData.slice(3);
+    const rankTop3 = rankData.slice(0, 3);
+    const rankRest = rankData.slice(3);
+
+    const prevMonthDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1);
+    const prevMonthLabel = `tháng ${prevMonthDate.getMonth() + 1}/${prevMonthDate.getFullYear()}`;
 
     return (
-        <div className="max-w-2xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        {tab === 'winrate'
-                            ? <><TrendingUp className="w-6 h-6 text-green-500" /> Bảng xếp hạng</>
-                            : <><Trophy className="w-6 h-6 text-blue-500" /> Bảng xếp hạng</>
-                        }
-                    </h1>
-                    <p className="text-gray-500 text-sm mt-0.5">
-                        {tab === 'winrate'
-                            ? 'Tính theo % thắng set giao hữu được duyệt trong tháng'
-                            : 'Tính theo điểm LP tích lũy — thắng/thua net set × 5 điểm'
-                        }
-                    </p>
-                </div>
-                <button onClick={handleRefresh} className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
+        <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Bảng xếp hạng</h1>
+                <button onClick={refreshAll} className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 flex-shrink-0">
                     <RefreshCw className="w-4 h-4" />
                 </button>
             </div>
 
-            <div className="flex border border-gray-200 rounded-xl bg-gray-50 p-1 gap-1">
-                <button
-                    onClick={() => setTab('winrate')}
-                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${tab === 'winrate' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                    <TrendingUp className="w-4 h-4" /> Win Rate tháng
-                </button>
-                <button
-                    onClick={() => setTab('rank')}
-                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${tab === 'rank' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                    <Trophy className="w-4 h-4" /> Rank LP 💎
-                </button>
-            </div>
-
-            {loading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+                {/* ── Cột: Theo số buổi tham gia ── */}
                 <div className="space-y-3">
-                    {[...Array(8)].map((_, i) => <div key={i} className="card h-16 animate-pulse bg-gray-100" />)}
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                            <h2 className="font-bold text-gray-900 flex items-center gap-1.5 text-sm sm:text-base">
+                                <Users className="w-4 h-4 text-blue-500 flex-shrink-0" /> <span className="truncate">THEO SỐ BUỔI THAM GIA</span>
+                            </h2>
+                            <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Xếp hạng thành viên theo tổng số buổi tham gia trong tháng</p>
+                        </div>
+                        <MonthDropdown options={monthOptions} value={selectedMonth} onChange={setSelectedMonth} />
+                    </div>
+
+                    {loadingSessions ? (
+                        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="card h-14 animate-pulse bg-gray-100" />)}</div>
+                    ) : sessionData.length === 0 ? (
+                        <div className="card py-10 text-center text-gray-400">
+                            <Users className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                            <p className="text-sm">Chưa có dữ liệu</p>
+                        </div>
+                    ) : (
+                        <>
+                            <TopThree
+                                data={sessionTop3}
+                                valueKey="sessions_this_month"
+                                valueSuffix="buổi"
+                                deltaKey="sessions_delta"
+                                deltaSuffix="buổi"
+                                deltaLabel={`so với ${prevMonthLabel}`}
+                            />
+                            {sessionRest.length > 0 && <SessionTable data={sessionRest} prevMonthLabel={prevMonthLabel} />}
+                            <p className="text-[11px] text-gray-400 flex items-start gap-1.5 px-1">
+                                <span>ⓘ</span>
+                                <span>Tỷ lệ tham gia = (Số buổi đã tham gia / Tổng số lần đã đăng ký) × 100%. Chỉ tính các buổi trong tháng đã kết thúc.</span>
+                            </p>
+                        </>
+                    )}
                 </div>
-            ) : tab === 'winrate' ? (
-                winRateData.length === 0 ? (
-                    <div className="card py-16 text-center text-gray-400">
-                        <Swords className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                        <p>Chưa có dữ liệu win rate tháng này</p>
+
+                {/* ── Cột: Theo điểm leo rank ── */}
+                <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                            <h2 className="font-bold text-gray-900 flex items-center gap-1.5 text-sm sm:text-base">
+                                <Trophy className="w-4 h-4 text-purple-500 flex-shrink-0" /> <span className="truncate">THEO ĐIỂM LEO RANK</span>
+                            </h2>
+                            <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Xếp hạng thành viên theo tổng điểm tích lũy để leo rank</p>
+                        </div>
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 whitespace-nowrap flex-shrink-0">
+                            <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                            <span className="hidden sm:inline">Tất cả thời gian</span>
+                            <span className="sm:hidden">Tất cả</span>
+                        </span>
                     </div>
-                ) : (
-                    <>
-                        {top3WR.length >= 1 && <WinRatePodium top3={top3WR} />}
-                        {winRateData.length > 3 && (
-                            <WinRateList data={winRateData.slice(3)} startPos={4} />
-                        )}
-                    </>
-                )
-            ) : (
-                rankData.length === 0 ? (
-                    <div className="card py-16 text-center text-gray-400">
-                        <Trophy className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                        <p>Chưa có dữ liệu rank</p>
-                    </div>
-                ) : (
-                    <>
-                        {top3Rank.length >= 1 && <RankPodium top3={top3Rank} />}
-                        {rankData.length > 3 && <RankList data={rankData.slice(3)} startPos={4} />}
-                    </>
-                )
-            )}
+
+                    {loadingRank ? (
+                        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="card h-14 animate-pulse bg-gray-100" />)}</div>
+                    ) : rankData.length === 0 ? (
+                        <div className="card py-10 text-center text-gray-400">
+                            <Trophy className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                            <p className="text-sm">Chưa có dữ liệu</p>
+                        </div>
+                    ) : (
+                        <>
+                            <TopThree
+                                data={rankTop3}
+                                valueKey="total_points"
+                                valueSuffix="điểm"
+                                deltaKey="points_this_week"
+                                deltaSuffix="điểm"
+                                deltaLabel="so với tuần trước"
+                                renderSub={(m) => (
+                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${getTierConfig(m.tier).color}`}>
+                                        💎 {m.tier}
+                                    </span>
+                                )}
+                            />
+                            {rankRest.length > 0 && <RankTable data={rankRest} />}
+                            <p className="text-[11px] text-gray-400 flex items-start gap-1.5 px-1">
+                                <span>⭐</span>
+                                <span>Điểm được tính từ: tham gia buổi đánh, chiến thắng, chuỗi thắng. Điểm càng cao, rank càng cao và mở khóa nhiều quyền lợi!</span>
+                            </p>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
