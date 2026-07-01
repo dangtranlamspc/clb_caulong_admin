@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Calculator, Send, Divide } from 'lucide-react';
+import { ArrowLeft, Loader2, Calculator, Send, Divide, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { sessionsApi } from '../../api';
 
@@ -38,6 +38,8 @@ export default function SessionFinishPage() {
     const [otherFees, setOtherFees] = useState<Record<string, number>>({});
     const [otherFeeNotes, setOtherFeeNotes] = useState<Record<string, string>>({});
 
+    const [walletDeductIds, setWalletDeductIds] = useState<Set<string>>(new Set());
+
     const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
@@ -61,7 +63,6 @@ export default function SessionFinishPage() {
                 hosts.forEach((h: any) => {
                     const hostGender = h.is_guest ? h.guest_gender : h.users?.gender;
                     const hostDefault = hostGender === 'female' ? priceFemale : priceMale;
-                    // Ưu tiên base_amount đã lưu (nếu buổi từng được tính trước đó), fallback amount_override, rồi giá mặc định
                     initAmounts[h.id] = h.base_amount ?? h.amount_override ?? hostDefault;
                 });
                 setAmounts(initAmounts);
@@ -73,7 +74,6 @@ export default function SessionFinishPage() {
                 });
                 setGuestAmounts(initGuestAmounts);
 
-                // Khôi phục lại các khoản khác riêng từng nhập trước đó (nếu có)
                 const initOtherFees: Record<string, number> = {};
                 confirmed.forEach((reg: any) => {
                     if (reg.other_fee_amount) initOtherFees[reg.id] = reg.other_fee_amount;
@@ -95,6 +95,15 @@ export default function SessionFinishPage() {
         Object.values(amounts).reduce((a, b) => a + (Number(b) || 0), 0) +
         Object.values(guestAmounts).reduce((a, b) => a + (Number(b) || 0), 0) +
         Object.values(otherFees).reduce((a, b) => a + (Number(b) || 0), 0);
+
+    const toggleWalletDeduct = (registrationId: string) => {
+        setWalletDeductIds(prev => {
+            const next = new Set(prev);
+            if (next.has(registrationId)) next.delete(registrationId);
+            else next.add(registrationId);
+            return next;
+        });
+    };
 
     const handleSplitEqually = () => {
         const allMembers = registrations;
@@ -157,7 +166,12 @@ export default function SessionFinishPage() {
     const handleSubmit = async () => {
         setSubmitting(true);
         try {
-            const allAmounts: { registration_id: string; amount: number; base_amount: number; other_fee_amount: number }[] = [];
+            const allAmounts: {
+                registration_id: string;
+                amount: number;
+                base_amount: number;
+                other_fee_amount: number;
+            }[] = [];
 
             hostRows.forEach(h => {
                 const base = Number(amounts[h.id]) || 0;
@@ -188,6 +202,7 @@ export default function SessionFinishPage() {
                 other_fee: totalOtherFees,
                 other_fee_note: Object.values(otherFeeNotes).filter(Boolean).join(', ') || undefined,
                 amounts: allAmounts,
+                wallet_deduct: Array.from(walletDeductIds),
             });
             toast.success('Đã kết thúc buổi và gửi hóa đơn thanh toán!');
             navigate(`/sessions/${id}`);
@@ -249,6 +264,19 @@ export default function SessionFinishPage() {
                 </div>
             </div>
 
+            {/* Legend thanh toán */}
+            <div className="flex items-center gap-4 px-1 text-xs text-gray-400">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded border-2 border-gray-300" />
+                    <span>Tự thanh toán</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded bg-blue-600" />
+                    <Wallet className="w-3 h-3 text-blue-600" />
+                    <span>Trừ thẳng ví BNB</span>
+                </div>
+            </div>
+
             {/* Số tiền từng người */}
             <div className="card !p-0 overflow-hidden">
                 <div className="flex items-center justify-between px-4 pt-4 pb-3">
@@ -265,22 +293,55 @@ export default function SessionFinishPage() {
                     {hostRows.map(h => {
                         const guests = guestsOf(h.id);
                         const name = h.is_guest ? h.guest_full_name : h.users?.full_name;
-                        return (
-                            <div key={h.id} className="px-4 py-3 space-y-2">
+                        const isRealUser = !!h.user_id && !h.is_guest;
+                        const isWalletDeduct = walletDeductIds.has(h.id);
 
-                                {/* ── Host ── */}
+                        return (
+                            <div
+                                key={h.id}
+                                className={`px-4 py-3 space-y-2 transition-colors ${isWalletDeduct ? 'bg-blue-50/40' : ''}`}
+                            >
                                 <div className="flex items-center gap-3">
-                                    <p className="flex-1 text-sm font-semibold text-gray-900 truncate">
-                                        {name}
-                                        {h.is_guest && <span className="text-xs text-gray-400 ml-1">(khách)</span>}
-                                    </p>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-semibold text-gray-900 truncate">
+                                                {name}
+                                                {h.is_guest && <span className="text-xs text-gray-400 ml-1">(khách)</span>}
+                                            </p>
+                                            {isWalletDeduct && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 flex-shrink-0">
+                                                    <Wallet className="w-2.5 h-2.5" /> Ví BNB
+                                                </span>
+                                            )}
+                                        </div>
+                                        {guests.length > 0 && isWalletDeduct && (
+                                            <p className="text-[10px] text-blue-500 mt-0.5">
+                                                ⓘ Có {guests.length} khách đi cùng — member sẽ chọn gộp/riêng sau
+                                            </p>
+                                        )}
+                                    </div>
+
                                     <input
                                         type="text" inputMode="numeric"
                                         value={formatNumberInput(amounts[h.id] ?? 0)}
                                         onChange={e => handleHostAmountChange(h.id, parseNumberInput(e.target.value))}
-                                        className="input-field w-32 text-right text-sm"
+                                        className="input-field w-32 text-right text-sm flex-shrink-0"
                                         placeholder="0"
                                     />
+
+                                    {isRealUser && (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleWalletDeduct(h.id)}
+                                            title={isWalletDeduct ? 'Bỏ trừ ví' : 'Trừ thẳng ví BNB'}
+                                            className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border-2 transition-all ${isWalletDeduct
+                                                ? 'bg-blue-600 border-blue-600 text-white'
+                                                : 'border-gray-200 text-gray-300 hover:border-blue-300 hover:text-blue-400'
+                                                }`}
+                                        >
+                                            <Wallet className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center gap-2">
@@ -301,15 +362,15 @@ export default function SessionFinishPage() {
                                     />
                                 </div>
 
-                                {/* ── Guests ── */}
                                 {guests.map((g: any) => (
                                     <div key={g.id} className="pl-4 space-y-1.5 border-l-2 border-purple-100">
-
-                                        {/* Tên + tiền guest */}
                                         <div className="flex items-center gap-3">
                                             <p className="flex-1 text-xs text-purple-600 truncate">
                                                 + {g.guest_full_name}
                                                 <span className="text-gray-400 ml-1">(đi cùng)</span>
+                                                {isWalletDeduct && (
+                                                    <span className="text-blue-400 ml-1">· chờ xác nhận</span>
+                                                )}
                                             </p>
                                             <input
                                                 type="text" inputMode="numeric"
@@ -320,7 +381,6 @@ export default function SessionFinishPage() {
                                             />
                                         </div>
 
-                                        {/* Khoản thu khác của guest — ngay dưới guest, cùng indent */}
                                         <div className="flex items-center gap-2">
                                             <input
                                                 type="text" inputMode="numeric"
@@ -339,16 +399,28 @@ export default function SessionFinishPage() {
                                         </div>
                                     </div>
                                 ))}
-
                             </div>
                         );
                     })}
                 </div>
 
-                <div className="flex justify-between text-sm font-bold px-4 py-3 bg-gray-50">
+                <div className="flex justify-between text-sm font-bold px-4 py-3 bg-gray-50 border-t border-gray-100">
                     <span>Tổng thu</span>
                     <span className="text-blue-600">{fmt(totalCollected)}</span>
                 </div>
+
+                {walletDeductIds.size > 0 && (
+                    <div className="px-4 py-3 bg-blue-50 border-t border-blue-100 flex items-center gap-2 text-xs text-blue-700">
+                        <Wallet className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>
+                            {walletDeductIds.size} thành viên sẽ được trừ thẳng ví BNB —
+                            tổng{' '}
+                            {fmt(Array.from(walletDeductIds).reduce((sum, regId) => {
+                                return sum + (Number(amounts[regId]) || 0) + (Number(otherFees[regId]) || 0);
+                            }, 0))}
+                        </span>
+                    </div>
+                )}
             </div>
 
             <div className="flex justify-end gap-3">
