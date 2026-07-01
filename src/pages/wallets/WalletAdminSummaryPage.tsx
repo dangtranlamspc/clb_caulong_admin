@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Loader2, Wallet, Search,
     TrendingDown, Users, AlertTriangle,
     Download, ChevronLeft, ChevronRight, MoreHorizontal,
-    Plus, SlidersHorizontal, X
+    Plus, SlidersHorizontal, X, ArrowUp, ArrowDown, ArrowUpDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -80,6 +80,7 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
     const [loadingTx, setLoadingTx] = useState(true);
 
     const amount = parseThousands(amountDisplay);
+    const formOpen = showTopup || showAdjust;
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setAmountDisplay(formatThousands(e.target.value, showAdjust));
@@ -97,6 +98,8 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
 
     useEffect(() => { fetchTx(); }, [fetchTx]);
 
+    const closeForm = () => { setShowTopup(false); setShowAdjust(false); setAmountDisplay(''); setNote(''); };
+
     const handleSubmit = async (isTopup: boolean) => {
         if (!amount || (isTopup && amount < 1000)) { toast.error('Số tiền không hợp lệ'); return; }
         setSubmitting(true);
@@ -106,7 +109,7 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
                 : await walletAdminApi.manualAdjust(member.id, amount, note || undefined);
 
             toast.success('Đã cập nhật số dư');
-            setShowTopup(false); setShowAdjust(false); setAmountDisplay(''); setNote('');
+            closeForm();
             fetchTx();
             onChanged(data.new_balance);
         } catch (err: any) {
@@ -129,7 +132,7 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
                         <p className="text-xs text-gray-400 mt-0.5">{member.phone}</p>
                     </div>
                 </div>
-                <button onClick={onClose} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 flex-shrink-0">
+                <button onClick={onClose} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-transform duration-150 active:scale-90 flex-shrink-0">
                     <X className="w-4 h-4 text-gray-500" />
                 </button>
             </div>
@@ -143,52 +146,61 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
 
             <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex gap-2">
                 <button onClick={() => { setShowTopup(true); setShowAdjust(false); }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold">
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition-transform duration-150 active:scale-95 text-white text-xs sm:text-sm font-semibold">
                     <Plus className="w-3.5 h-3.5" /> Nạp tiền
                 </button>
                 <button onClick={() => { setShowAdjust(true); setShowTopup(false); }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-medium">
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-transform duration-150 active:scale-95 text-gray-700 text-xs sm:text-sm font-medium">
                     <SlidersHorizontal className="w-3.5 h-3.5" /> Điều chỉnh
                 </button>
             </div>
 
-            {(showTopup || showAdjust) && (
-                <div className="px-4 sm:px-5 py-3 bg-blue-50 border-b border-blue-100">
-                    <p className="text-xs font-semibold text-blue-800 mb-2">
-                        {showTopup ? 'Nạp tiền thủ công' : 'Điều chỉnh số dư (có thể nhập số âm)'}
-                    </p>
-                    <div className="flex flex-col gap-2">
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            value={amountDisplay}
-                            onChange={handleAmountChange}
-                            placeholder="Số tiền"
-                            className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
-                        />
-                        <input
-                            value={note}
-                            onChange={e => setNote(e.target.value)}
-                            placeholder="Ghi chú"
-                            className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white"
-                        />
-                        <button
-                            onClick={() => handleSubmit(showTopup)}
-                            disabled={submitting}
-                            className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-1.5"
-                        >
-                            {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Xác nhận'}
-                        </button>
+            <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-out ${formOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                    }`}
+            >
+                <div className="overflow-hidden">
+                    <div className="px-4 sm:px-5 py-3 bg-blue-50 border-b border-blue-100">
+                        <p className="text-xs font-semibold text-blue-800 mb-2">
+                            {showTopup ? 'Nạp tiền thủ công' : 'Điều chỉnh số dư (có thể nhập số âm)'}
+                        </p>
+                        <div className="flex flex-col gap-2">
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                value={amountDisplay}
+                                onChange={handleAmountChange}
+                                placeholder="Số tiền"
+                                className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-shadow duration-150 bg-white"
+                            />
+                            <input
+                                value={note}
+                                onChange={e => setNote(e.target.value)}
+                                placeholder="Ghi chú"
+                                className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-shadow duration-150 bg-white"
+                            />
+                            <button
+                                onClick={() => handleSubmit(showTopup)}
+                                disabled={submitting}
+                                className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 transition-transform duration-150 active:scale-[0.98] text-white text-sm font-semibold rounded-lg disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-1.5"
+                            >
+                                {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Xác nhận'}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            )}
+            </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
                 <div className="px-4 sm:px-5 pt-4 pb-2">
                     <p className="font-bold text-gray-900 text-sm">Lịch sử giao dịch</p>
                 </div>
                 {loadingTx ? (
-                    <div className="px-4 sm:px-5 py-6 text-center text-gray-400 text-sm">Đang tải...</div>
+                    <div className="px-4 sm:px-5 py-2 space-y-2">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />
+                        ))}
+                    </div>
                 ) : transactions.length === 0 ? (
                     <div className="px-4 sm:px-5 py-6 text-center text-gray-400 text-sm">Chưa có giao dịch nào</div>
                 ) : (
@@ -196,7 +208,7 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
                         <table className="w-full text-xs sm:text-sm">
                             <tbody>
                                 {transactions.map((tx: any) => (
-                                    <tr key={tx.id} className="hover:bg-gray-50 border-b border-gray-50">
+                                    <tr key={tx.id} className="hover:bg-gray-50 border-b border-gray-50 animate-row-fade">
                                         <td className="px-4 sm:px-5 py-2.5 text-xs text-gray-400 whitespace-nowrap">
                                             {format(new Date(tx.created_at), 'dd/MM/yyyy', { locale: vi })}
                                         </td>
@@ -218,17 +230,27 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
     );
 }
 
+type SortField = 'balance' | 'full_name' | 'last_session_at';
+type SortOrder = 'asc' | 'desc';
+
 export default function WalletAdminSummaryPage() {
     const [stats, setStats] = useState<any>(null);
     const [members, setMembers] = useState<any[]>([]);
     const [meta, setMeta] = useState<any>({ total: 0, total_pages: 0 });
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const hasLoadedRef = useRef(false);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [rankFilter, setRankFilter] = useState('');
     const [selectedMember, setSelectedMember] = useState<any | null>(null);
     const [page, setPage] = useState(1);
+    const [sortField, setSortField] = useState<SortField>('balance');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
     const perPage = 8;
+
+    const [panelMember, setPanelMember] = useState<any | null>(null);
+    const [panelOpen, setPanelOpen] = useState(false);
 
     const fetchSummary = useCallback(async () => {
         const { data } = await walletAdminApi.getSummary();
@@ -236,32 +258,95 @@ export default function WalletAdminSummaryPage() {
     }, []);
 
     const fetchMembers = useCallback(async () => {
-        setLoading(true);
+        if (!hasLoadedRef.current) setLoading(true);
+        else setRefreshing(true);
         try {
             const { data } = await walletAdminApi.listMembers({
                 search: search || undefined,
                 status: statusFilter || undefined,
                 rank: rankFilter || undefined,
                 page, limit: perPage,
+                sort_by: sortField,
+                sort_order: sortOrder,
             });
             setMembers(data.data ?? []);
             setMeta(data.meta ?? {});
+            hasLoadedRef.current = true;
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
-    }, [search, statusFilter, rankFilter, page]);
+    }, [search, statusFilter, rankFilter, page, sortField, sortOrder]);
 
     useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
-    // debounce search 350ms
     useEffect(() => {
         const t = setTimeout(() => { setPage(1); fetchMembers(); }, 350);
         return () => clearTimeout(t);
     }, [search]);
 
-    useEffect(() => { fetchMembers(); }, [statusFilter, rankFilter, page]);
+    useEffect(() => { fetchMembers(); }, [statusFilter, rankFilter, page, sortField, sortOrder]);
+
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (selectedMember) {
+            setPanelMember(selectedMember);
+            let raf2 = 0;
+            const raf1 = requestAnimationFrame(() => {
+                raf2 = requestAnimationFrame(() => setPanelOpen(true));
+            });
+            return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+        } else {
+            setPanelOpen(false);
+        }
+    }, [selectedMember]);
+
+
+    useEffect(() => {
+        if (panelOpen || !panelMember) return;
+        const el = panelRef.current;
+        if (!el) { setPanelMember(null); return; }
+        let done = false;
+        const finish = () => { if (done) return; done = true; setPanelMember(null); };
+        const onEnd = (e: TransitionEvent) => { if (e.propertyName === 'transform') finish(); };
+        el.addEventListener('transitionend', onEnd);
+        const fallback = setTimeout(finish, 350);
+        return () => { el.removeEventListener('transitionend', onEnd); clearTimeout(fallback); };
+    }, [panelOpen, panelMember]);
+
+    useEffect(() => {
+        if (!panelMember) return;
+        const scrollY = window.scrollY;
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = '100%';
+        return () => {
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.width = '';
+            window.scrollTo(0, scrollY);
+        };
+    }, [panelMember]);
 
     const totalPages = meta.total_pages ?? 0;
+
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
+        } else {
+            setSortField(field);
+            setSortOrder('desc');
+        }
+        setPage(1);
+    };
+
+    const SortIcon = ({ field }: { field: SortField }) => {
+        if (sortField !== field) return <ArrowUpDown className="w-3 h-3 text-gray-300" />;
+        return sortOrder === 'desc'
+            ? <ArrowDown className="w-3 h-3 text-blue-600" />
+            : <ArrowUp className="w-3 h-3 text-blue-600" />;
+    };
 
     if (!stats) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>;
@@ -293,6 +378,20 @@ export default function WalletAdminSummaryPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 font-sans">
+            <style>{`
+                @keyframes rowFade {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                .animate-row-fade { animation: rowFade 0.25s ease-out both; }
+
+                @keyframes cardFadeUp {
+                    from { opacity: 0; transform: translate3d(0, 4px, 0); }
+                    to { opacity: 1; transform: translate3d(0, 0, 0); }
+                }
+                .animate-card-fade { animation: cardFadeUp 0.28s ease-out both; will-change: transform, opacity; }
+            `}</style>
+
             <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Wallet className="w-5 h-5 text-blue-600" />
@@ -301,10 +400,13 @@ export default function WalletAdminSummaryPage() {
             </div>
 
             <div className="px-3 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
-                {/* ── Stat cards: 2 cột trên mobile, 4 cột trên desktop ── */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                    {statCards.map(s => (
-                        <div key={s.label} className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+                    {statCards.map((s, i) => (
+                        <div
+                            key={s.label}
+                            className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100 animate-card-fade"
+                            style={{ animationDelay: `${i * 40}ms` }}
+                        >
                             <div className="flex items-center gap-2 mb-2 sm:mb-3">
                                 <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${s.iconBg}`}>{s.icon}</div>
                                 <p className="text-[11px] sm:text-xs text-gray-500 leading-tight">{s.label}</p>
@@ -317,7 +419,6 @@ export default function WalletAdminSummaryPage() {
 
                 <div className={`flex flex-col lg:flex-row gap-4 ${selectedMember ? 'lg:items-start' : ''}`}>
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 min-w-0">
-                        {/* ── Thanh tìm kiếm + filter: xếp dọc trên mobile ── */}
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100">
                             <div className="relative flex-1 sm:max-w-xs">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -325,7 +426,7 @@ export default function WalletAdminSummaryPage() {
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
                                     placeholder="Tìm kiếm thành viên..."
-                                    className="pl-8 pr-3 py-2 sm:py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 w-full"
+                                    className="pl-8 pr-3 py-2 sm:py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-shadow duration-150 w-full"
                                 />
                             </div>
                             <div className="flex gap-2">
@@ -344,29 +445,57 @@ export default function WalletAdminSummaryPage() {
                             </div>
                         </div>
 
-                        {/* ── Danh sách: bảng cuộn ngang trên mobile, ẩn bớt cột phụ ── */}
-                        <div className="overflow-x-auto">
+                        <div
+                            className={`overflow-x-auto transition-opacity duration-200 ${refreshing ? 'opacity-50 pointer-events-none' : 'opacity-100'
+                                }`}
+                        >
                             <table className="w-full text-sm min-w-[640px]">
                                 <thead>
                                     <tr className="border-b border-gray-100">
-                                        <th className="text-left px-4 sm:px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Thành viên</th>
+                                        <th className="text-left px-4 sm:px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                            <button
+                                                onClick={() => handleSort('full_name')}
+                                                className="flex items-center gap-1 hover:text-gray-600 transition-colors duration-150"
+                                            >
+                                                Thành viên <SortIcon field="full_name" />
+                                            </button>
+                                        </th>
                                         <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Hạng</th>
-                                        <th className="text-right px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Số dư ví</th>
+                                        <th className="text-right px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                            <button
+                                                onClick={() => handleSort('balance')}
+                                                className="flex items-center gap-1 hover:text-gray-600 transition-colors duration-150 ml-auto"
+                                            >
+                                                Số dư ví <SortIcon field="balance" />
+                                            </button>
+                                        </th>
                                         <th className="text-center px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Trạng thái</th>
-                                        <th className="hidden sm:table-cell text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Buổi gần nhất</th>
+                                        <th className="hidden sm:table-cell text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                            <button
+                                                onClick={() => handleSort('last_session_at')}
+                                                className="flex items-center gap-1 hover:text-gray-600 transition-colors duration-150"
+                                            >
+                                                Buổi gần nhất <SortIcon field="last_session_at" />
+                                            </button>
+                                        </th>
                                         <th className="px-4 sm:px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loading ? (
                                         [...Array(5)].map((_, i) => (
-                                            <tr key={i}><td colSpan={6} className="px-4 sm:px-5 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                                            <tr key={i}>
+                                                <td colSpan={6} className="px-4 sm:px-5 py-3">
+                                                    <div className="h-4 bg-gray-100 rounded animate-pulse" />
+                                                </td>
+                                            </tr>
                                         ))
                                     ) : members.length === 0 ? (
                                         <tr><td colSpan={6} className="px-4 sm:px-5 py-12 text-center text-gray-400">Không tìm thấy thành viên</td></tr>
-                                    ) : members.map(m => (
+                                    ) : members.map((m, i) => (
                                         <tr key={m.id}
-                                            className={`border-b border-gray-50 hover:bg-blue-50/30 cursor-pointer transition-colors ${selectedMember?.id === m.id ? 'bg-blue-50' : ''}`}
+                                            className={`border-b border-gray-50 hover:bg-blue-50/30 cursor-pointer transition-colors duration-150 animate-row-fade ${selectedMember?.id === m.id ? 'bg-blue-50' : ''}`}
+                                            style={{ animationDelay: `${Math.min(i, 8) * 25}ms` }}
                                             onClick={() => setSelectedMember(selectedMember?.id === m.id ? null : m)}
                                         >
                                             <td className="px-4 sm:px-5 py-3">
@@ -389,7 +518,7 @@ export default function WalletAdminSummaryPage() {
                                             <td className="px-4 sm:px-5 py-3 text-right">
                                                 <button
                                                     onClick={e => { e.stopPropagation(); setSelectedMember(m); }}
-                                                    className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 whitespace-nowrap"
+                                                    className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-transform duration-150 active:scale-95 whitespace-nowrap"
                                                 >
                                                     Chi tiết
                                                 </button>
@@ -407,35 +536,48 @@ export default function WalletAdminSummaryPage() {
                             </p>
                             <div className="flex items-center gap-1 order-1 sm:order-2">
                                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                                    className="w-7 h-7 rounded-md border border-gray-200 flex items-center justify-center disabled:opacity-40 hover:bg-gray-50">
+                                    className="w-7 h-7 rounded-md border border-gray-200 flex items-center justify-center disabled:opacity-40 hover:bg-gray-50 transition-transform duration-150 active:scale-90">
                                     <ChevronLeft className="w-3.5 h-3.5" />
                                 </button>
                                 {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
                                     <button key={p} onClick={() => setPage(p)}
-                                        className={`w-7 h-7 rounded-md text-xs font-medium ${page === p ? 'bg-blue-600 text-white' : 'border border-gray-200 hover:bg-gray-50 text-gray-600'}`}>
+                                        className={`w-7 h-7 rounded-md text-xs font-medium transition-transform duration-150 active:scale-90 ${page === p ? 'bg-blue-600 text-white' : 'border border-gray-200 hover:bg-gray-50 text-gray-600'}`}>
                                         {p}
                                     </button>
                                 ))}
                                 <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}
-                                    className="w-7 h-7 rounded-md border border-gray-200 flex items-center justify-center disabled:opacity-40 hover:bg-gray-50">
+                                    className="w-7 h-7 rounded-md border border-gray-200 flex items-center justify-center disabled:opacity-40 hover:bg-gray-50 transition-transform duration-150 active:scale-90">
                                     <ChevronRight className="w-3.5 h-3.5" />
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    {selectedMember && (
+                    {panelMember && (
                         <>
-                            <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSelectedMember(null)} />
-                            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] rounded-t-2xl overflow-hidden flex flex-col
-                       lg:static lg:z-auto lg:w-[420px] lg:flex-shrink-0 lg:rounded-xl lg:max-h-[calc(100vh-200px)]
-                       bg-white shadow-sm border border-gray-100">
+                            <div
+                                className={`fixed inset-0 bg-black/30 z-40 lg:hidden transition-opacity duration-250 ${panelOpen ? 'opacity-100' : 'opacity-0'
+                                    }`}
+                                style={{ touchAction: 'none' }}
+                                onClick={() => setSelectedMember(null)}
+                            />
+                            <div
+                                ref={panelRef}
+                                className={`fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] rounded-t-2xl overflow-hidden flex flex-col
+                       lg:static lg:z-auto lg:w-[420px] lg:flex-shrink-0 lg:rounded-xl lg:max-h-[calc(100dvh-200px)]
+                       bg-white shadow-sm border border-gray-100 transform-gpu overscroll-contain
+                       transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform
+                       ${panelOpen
+                                        ? 'translate-y-0 opacity-100 lg:translate-x-0'
+                                        : 'translate-y-full opacity-0 lg:translate-y-0 lg:translate-x-6'
+                                    }`}
+                            >
                                 <div className="lg:hidden flex justify-center pt-2 pb-1 flex-shrink-0">
                                     <span className="w-10 h-1 rounded-full bg-gray-200" />
                                 </div>
-                                <div className="flex-1 min-h-0">
+                                <div className="flex-1 min-h-0 overscroll-contain">
                                     <MemberPanel
-                                        member={selectedMember}
+                                        member={panelMember}
                                         onClose={() => setSelectedMember(null)}
                                         onChanged={(newBalance) => {
                                             if (typeof newBalance === 'number') {

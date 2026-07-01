@@ -269,12 +269,10 @@ export default function SessionDetailPage() {
     // Số tiền hiển thị cho mỗi đăng ký: giá do admin nhập riêng (amount_override) = phần
     // tiền sân + tiền cầu của người đó, không còn fallback theo giá nam/nữ mặc định.
     const formatVnd = (n: number) => Math.round(n ?? 0).toLocaleString('vi-VN') + 'đ';
-    const getRegAmount = (reg: any) => reg.amount_override;
 
-    // Số tiền cuối cùng mỗi người phải trả = chính amount_override (đã được tính sẵn ở màn
-    // "Kết thúc buổi": phần sân+cầu của người đó + khoản khác riêng của người đó, nếu có —
-    // xem SessionFinishPage.handleSubmit). KHÔNG cộng thêm session.other_fee ở đây vì sẽ
-    // bị tính trùng — nó đã nằm trong amount_override rồi.
+    // Số tiền cuối cùng mỗi người phải trả = amount_override (đã bao gồm cả sân+cầu + khoản khác).
+    // base_amount và other_fee_amount là 2 phần tách riêng được lưu từ SessionFinishPage mới
+    // (buổi cũ chưa có 2 field này sẽ không hiện breakdown).
 
     const renderRow = (reg: any, isNested = false) => {
 
@@ -293,7 +291,14 @@ export default function SessionDetailPage() {
         const user = reg.users;
         const displayName = user?.full_name ?? reg.guest_full_name ?? '?';
         const displayGender = user?.gender ?? reg.guest_gender;
-        const regAmount = getRegAmount(reg);
+
+        const totalAmount = reg.amount_override;
+        // Chỉ hiện breakdown nếu có đủ 2 phần tách riêng (buổi mới) và khoản khác > 0
+        const hasBreakdown = totalAmount != null
+            && reg.base_amount != null
+            && reg.other_fee_amount != null
+            && reg.other_fee_amount > 0
+            && reg.payment_method !== 'grouped_with_host';
 
         const canReviewPayment =
             Boolean(reg.payment_reference) ||
@@ -412,11 +417,11 @@ export default function SessionDetailPage() {
                                     </span>
                                 )}
 
-                                {/* Số tiền cần trả: amount_override đã là tổng cuối cùng (sân+cầu + khoản khác riêng nếu có) */}
+                                {/* Số tiền cần trả: amount_override là tổng, hiện breakdown nếu có base_amount + other_fee_amount */}
                                 {reg.payment_method !== 'grouped_with_host' && (
-                                    regAmount != null ? (
+                                    totalAmount != null ? (
                                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium whitespace-nowrap">
-                                            💰 {formatVnd(regAmount)}
+                                            💰 {formatVnd(totalAmount)}
                                         </span>
                                     ) : (
                                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-400 italic whitespace-nowrap">
@@ -451,6 +456,14 @@ export default function SessionDetailPage() {
                                     </span>
                                 )}
                             </div>
+
+                            {hasBreakdown && (
+                                <p className="text-[11px] text-gray-400 mt-1">
+                                    Sân + cầu: <span className="font-medium text-gray-500">{formatVnd(reg.base_amount)}</span>
+                                    {' + '}Khoản khác: <span className="font-medium text-gray-500">{formatVnd(reg.other_fee_amount)}</span>
+                                    {' = '}<span className="font-semibold text-gray-600">{formatVnd(totalAmount)}</span>
+                                </p>
+                            )}
 
                             {reg.notes && (
                                 <p className="text-xs text-gray-400 mt-1 italic">{reg.notes}</p>
@@ -523,7 +536,6 @@ export default function SessionDetailPage() {
                         </Link>
                     )}
 
-                    {/* ← THÊM VÀO ĐÂY */}
                     {canComplete && (
                         <button
                             onClick={async () => {

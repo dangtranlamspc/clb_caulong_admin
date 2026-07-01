@@ -26,6 +26,10 @@ export default function SessionCostCard({ sessionId }: Props) {
     const { chi_phi, paid_list, summary } = cost;
     const hasConfirmed = summary.has_confirmed;
 
+    // Breakdown khoản thu khác — lấy từ chi_phi.other_fee_list (tất cả registrations có khoản khác,
+    // bất kể đã xác nhận thanh toán hay chưa)
+    const otherFeeItems: { name: string; amount: number }[] = chi_phi.other_fee_list ?? [];
+
     return (
         <div className="space-y-3">
 
@@ -45,16 +49,30 @@ export default function SessionCostCard({ sessionId }: Props) {
                     <span className="font-medium">{fmt(chi_phi.court_fee)}</span>
                 </div>
 
-                {/* ── Khoản thu khác — chỉ hiện khi có giá trị ── */}
+                {/* ── Khoản thu khác — hiện tổng + chi tiết từng người nếu có ── */}
                 {chi_phi.other_fee > 0 && (
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">
-                            💰 Khoản thu khác
-                            {chi_phi.other_fee_note && (
-                                <span className="text-gray-400 italic"> ({chi_phi.other_fee_note})</span>
-                            )}
-                        </span>
-                        <span className="font-medium">{fmt(chi_phi.other_fee)}</span>
+                    <div className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">
+                                💰 Khoản thu khác
+                                {chi_phi.other_fee_note && (
+                                    <span className="text-gray-400 italic"> ({chi_phi.other_fee_note})</span>
+                                )}
+                            </span>
+                            <span className="font-medium">{fmt(chi_phi.other_fee)}</span>
+                        </div>
+
+                        {/* Chi tiết từng người — chỉ hiện nếu backend đã trả về breakdown */}
+                        {otherFeeItems.length > 0 && (
+                            <div className="ml-4 space-y-0.5 border-l-2 border-amber-100 pl-3">
+                                {otherFeeItems.map((item, i) => (
+                                    <div key={i} className="flex justify-between text-xs text-gray-500">
+                                        <span>{item.name}</span>
+                                        <span className="font-medium text-amber-600">{fmt(item.amount)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -4,14 +4,40 @@ import { rankingsApi } from '../../api';
 import { getTierConfig } from './rankConfig';
 import { RankPodiumAvatarList } from '../../components/Rank_for_list';
 
+const ATTENDANCE_TIERS = [
+    { min: 0, max: 1, icon: '🥚', label: 'Người Mới Tham Gia' },
+    { min: 2, max: 5, icon: '🏸', label: 'Làm Quen Sân' },
+    { min: 6, max: 12, icon: '💪', label: 'Bắt Nhịp' },
+    { min: 13, max: 25, icon: '⚡', label: 'Ổn Sân' },
+    { min: 26, max: 45, icon: '🔥', label: 'Thành Thạo Sân' },
+    { min: 46, max: 80, icon: '⭐', label: 'Gắn Bó CLB' },
+    { min: 81, max: 130, icon: '💎', label: 'Trụ Cột Sân' },
+    { min: 131, max: Infinity, icon: '👑', label: 'Lão Làng Sân Cầu' },
+];
+
 const POINTS_PER_TIER = 50;
 
-// ── Tam giác cân lên / xuống (thay cho icon Chevron) ──
 function TriangleUp({ className = '' }: { className?: string }) {
     return (
         <span
             className={`inline-block w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[9px] ${className}`}
         />
+    );
+}
+
+
+function getAttendanceTier(totalSessions: number) {
+    const t = ATTENDANCE_TIERS.find((t) => totalSessions >= t.min && totalSessions <= t.max);
+    return t ?? ATTENDANCE_TIERS[0];
+}
+
+function AttendanceLevelBadge({ totalSessions }: { totalSessions: number }) {
+    const tier = getAttendanceTier(totalSessions);
+    return (
+        <span className="inline-flex items-center gap-1 text-[9px] sm:text-xs font-medium text-gray-600 max-w-full">
+            <span className="flex-shrink-0">{tier.icon}</span>
+            <span className="truncate">{tier.label}</span>
+        </span>
     );
 }
 
@@ -23,10 +49,9 @@ function TriangleDown({ className = '' }: { className?: string }) {
     );
 }
 
-// ── Dropdown chọn tháng — tự dựng, có animation mở/đóng mượt ──
 function MonthDropdown({ options, value, onChange }: { options: Date[]; value: Date; onChange: (d: Date) => void }) {
     const [open, setOpen] = useState(false);
-    const [mounted, setMounted] = useState(false); // điều khiển animation enter/exit
+    const [mounted, setMounted] = useState(false);
     const wrapRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -104,7 +129,6 @@ function DeltaText({ delta, suffix }: { delta: number; suffix: string }) {
             </span>
         );
     }
-    // delta === 0 (hoặc -0) → chỉ hiện dấu gạch ngang
     return <span className="inline-flex items-center text-xs font-medium text-gray-400">-</span>;
 }
 
@@ -123,7 +147,6 @@ const POS_BADGE_CLS: Record<number, string> = {
     3: 'bg-orange-100 text-orange-700',
 };
 
-// ── 3 card top — bậc thang, #1 cao + vương miện ──
 function TopThree({ data, valueKey, valueSuffix, deltaKey, deltaSuffix, deltaLabel, renderSub }: {
     data: any[];
     valueKey: string;
@@ -183,6 +206,7 @@ function SessionTable({ data, prevMonthLabel }: { data: any[]; prevMonthLabel: s
                     <tr className="text-left text-[10px] sm:text-[11px] text-gray-400 border-b border-gray-100">
                         <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium w-8 sm:w-10">#</th>
                         <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium">Thành viên</th>
+                        <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium">Cấp độ</th>
                         <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-center whitespace-nowrap">Số buổi<br />tháng này</th>
                         <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-center">Tỷ lệ</th>
                         <th className="px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-right whitespace-nowrap">So với<br />{prevMonthLabel}</th>
@@ -201,6 +225,9 @@ function SessionTable({ data, prevMonthLabel }: { data: any[]; prevMonthLabel: s
                                         <Avatar src={m.avatar_url} name={m.full_name} size={28} />
                                         <span className="font-medium text-gray-800 truncate">{m.full_name}</span>
                                     </div>
+                                </td>
+                                <td className="px-2 sm:px-3 py-2 sm:py-2.5">
+                                    <AttendanceLevelBadge totalSessions={m.total_sessions ?? 0} />
                                 </td>
                                 <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-center font-semibold text-gray-700 whitespace-nowrap">{m.sessions_this_month} buổi</td>
                                 <td className="px-2 sm:px-3 py-2 sm:py-2.5">
@@ -226,7 +253,6 @@ function SessionTable({ data, prevMonthLabel }: { data: any[]; prevMonthLabel: s
     );
 }
 
-// ── Bảng "Theo điểm leo rank" ──
 function RankTable({ data }: { data: any[] }) {
     return (
         <div className="card !p-0 overflow-hidden overflow-x-auto">
@@ -295,7 +321,6 @@ export default function RankingsPage() {
     const today = new Date();
     const [selectedMonth, setSelectedMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
 
-    // Danh sách 12 tháng gần nhất để chọn (tháng hiện tại ở đầu)
     const monthOptions = Array.from({ length: 12 }, (_, i) => new Date(today.getFullYear(), today.getMonth() - i, 1));
 
     const fetchSessions = async (month: Date) => {
@@ -362,6 +387,7 @@ export default function RankingsPage() {
                                 deltaKey="sessions_delta"
                                 deltaSuffix="buổi"
                                 deltaLabel={`so với ${prevMonthLabel}`}
+                                renderSub={(m) => <AttendanceLevelBadge totalSessions={m.total_sessions ?? 0} />}
                             />
                             {sessionRest.length > 0 && <SessionTable data={sessionRest} prevMonthLabel={prevMonthLabel} />}
                             <p className="text-[11px] text-gray-400 flex items-start gap-1.5 px-1">
