@@ -437,10 +437,10 @@ export default function RankingsPage() {
                                 )}
                             />
                             {rankRest.length > 0 && <RankTable data={rankRest} />}
-                            <p className="text-[11px] text-gray-400 flex items-start gap-1.5 px-1">
+                            {/* <p className="text-[11px] text-gray-400 flex items-start gap-1.5 px-1">
                                 <span>⭐</span>
                                 <span>Điểm được tính từ: tham gia buổi đánh, chiến thắng, chuỗi thắng. Điểm càng cao, rank càng cao và mở khóa nhiều quyền lợi!</span>
-                            </p>
+                            </p> */}
                         </>
                     )}
                 </div>
