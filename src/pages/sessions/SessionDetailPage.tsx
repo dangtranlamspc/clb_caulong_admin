@@ -14,6 +14,7 @@ import { vi } from 'date-fns/locale';
 import { sessionsApi, registrationsApi, usersApi } from '../../api';
 import SessionCostCard from './SessionCostCard';
 import { MorphButton } from '../../components/MorphButton';
+import { supabase } from '../../lib/supabase';
 
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> = {
@@ -22,6 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> =
     confirmed: { label: 'Đã xác nhận thanh toán', cls: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2 },
     rejected: { label: 'Thanh toán bị từ chối', cls: 'bg-red-50 text-red-600 border-red-200', icon: XCircle },
     awaitingCheckin: { label: 'Chờ điểm danh', cls: 'bg-slate-50 text-slate-600 border border-slate-200', icon: Hourglass },
+    awaitingFinish: { label: 'Chờ buổi đánh kết thúc', cls: 'bg-slate-50 text-slate-600 border border-slate-200', icon: Hourglass },
 };
 
 const SKILL_LABEL: Record<string, string> = {
@@ -89,6 +91,17 @@ export default function SessionDetailPage() {
     };
 
     useEffect(() => { fetchAll(); }, [id]);
+
+    useEffect(() => {
+        if (!id) return;
+        const channel = supabase
+            .channel(`session:${id}`)
+            .on('broadcast', { event: 'session_updated' }, () => {
+                refreshSilently();
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [id]);
 
     useEffect(() => {
         if (!showAddModal) return;
@@ -240,9 +253,16 @@ export default function SessionDetailPage() {
 
     const canComplete = session.status === 'waiting_payment' && allPaid && registrations.filter(r => r.participation_status === 'confirmed').length > 0;
 
+    const awaitingFinish = registrations.filter(r =>
+        r.payment_status === 'pending' &&
+        r.participation_status === 'confirmed' &&
+        r.amount_override == null
+    );
+
     const pending = registrations.filter(r =>
         r.payment_status === 'pending' &&
-        r.participation_status !== 'awaiting_checkin' &&
+        r.participation_status === 'confirmed' &&
+        r.amount_override != null &&
         !r.payment_reference &&
         r.payment_method !== 'cash'
     );
@@ -250,7 +270,8 @@ export default function SessionDetailPage() {
     const pendingReview = registrations.filter(r =>
         r.payment_status === 'pending' && (
             Boolean(r.payment_reference) ||
-            (r.payment_method === 'cash' && r.amount_override != null)
+            (r.payment_method === 'cash' && r.amount_override != null) ||
+            r.payment_method === 'grouped_with_host'
         )
     );
 
@@ -266,26 +287,28 @@ export default function SessionDetailPage() {
 
     const canAddMember = session.status === 'open' || session.status === 'full';
 
-    // Số tiền hiển thị cho mỗi đăng ký: giá do admin nhập riêng (amount_override) = phần
-    // tiền sân + tiền cầu của người đó, không còn fallback theo giá nam/nữ mặc định.
     const formatVnd = (n: number) => Math.round(n ?? 0).toLocaleString('vi-VN') + 'đ';
-
-    // Số tiền cuối cùng mỗi người phải trả = amount_override (đã bao gồm cả sân+cầu + khoản khác).
-    // base_amount và other_fee_amount là 2 phần tách riêng được lưu từ SessionFinishPage mới
-    // (buổi cũ chưa có 2 field này sẽ không hiện breakdown).
 
     const renderRow = (reg: any, isNested = false) => {
 
         const isPendingReview = reg.payment_status === 'pending' && (
             Boolean(reg.payment_reference) ||
-            (reg.payment_method === 'cash' && reg.amount_override != null)
+            (reg.payment_method === 'cash' && reg.amount_override != null) ||
+            reg.payment_method === 'grouped_with_host'
         );
+
+        const isAwaitingFinish = reg.payment_status === 'pending'
+            && reg.participation_status === 'confirmed'
+            && reg.amount_override == null
+            && !isPendingReview;
 
         const cfg = reg.participation_status === 'awaiting_checkin'
             ? STATUS_CONFIG.awaitingCheckin
-            : isPendingReview
-                ? STATUS_CONFIG.pendingReview
-                : (STATUS_CONFIG[reg.payment_status] ?? STATUS_CONFIG.pending);
+            : isAwaitingFinish
+                ? STATUS_CONFIG.awaitingFinish
+                : isPendingReview
+                    ? STATUS_CONFIG.pendingReview
+                    : (STATUS_CONFIG[reg.payment_status] ?? STATUS_CONFIG.pending);
         const StatusIcon = cfg.icon;
         const busy = actionId === reg.id;
         const user = reg.users;
@@ -293,7 +316,6 @@ export default function SessionDetailPage() {
         const displayGender = user?.gender ?? reg.guest_gender;
 
         const totalAmount = reg.amount_override;
-        // Chỉ hiện breakdown nếu có đủ 2 phần tách riêng (buổi mới) và khoản khác > 0
         const hasBreakdown = totalAmount != null
             && reg.base_amount != null
             && reg.other_fee_amount != null
@@ -403,9 +425,6 @@ export default function SessionDetailPage() {
                                     </span>
                                 )}
 
-                                {/* Guest đi cùng host (host_registration_id) chỉ hiện "Tiền mặt" khi host
-                                    đã chọn thanh toán solo cho khách đó (payment_method === 'cash' đã set ở trên) */}
-
                                 <span className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 whitespace-nowrap ${cfg.cls}`}>
                                     <StatusIcon className="w-3 h-3" />
                                     {cfg.label}
@@ -417,7 +436,6 @@ export default function SessionDetailPage() {
                                     </span>
                                 )}
 
-                                {/* Số tiền cần trả: amount_override là tổng, hiện breakdown nếu có base_amount + other_fee_amount */}
                                 {reg.payment_method !== 'grouped_with_host' && (
                                     totalAmount != null ? (
                                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium whitespace-nowrap">
@@ -461,6 +479,9 @@ export default function SessionDetailPage() {
                                 <p className="text-[11px] text-gray-400 mt-1">
                                     Sân + cầu: <span className="font-medium text-gray-500">{formatVnd(reg.base_amount)}</span>
                                     {' + '}Khoản khác: <span className="font-medium text-gray-500">{formatVnd(reg.other_fee_amount)}</span>
+                                    {reg.other_fee_note && (
+                                        <span className="italic"> ({reg.other_fee_note})</span>
+                                    )}
                                     {' = '}<span className="font-semibold text-gray-600">{formatVnd(totalAmount)}</span>
                                 </p>
                             )}
@@ -599,13 +620,13 @@ export default function SessionDetailPage() {
                     </div>
                 </div>
 
-                {/* ── Chi phí buổi ── chỉ hiện khi đã cấu hình tiền sân hoặc số cầu */}
                 {hasCostData && <SessionCostCard sessionId={id!} />}
 
                 {/* Summary badges */}
                 <div className="flex gap-3 flex-wrap">
                     {[
                         { label: 'Chờ điểm danh', count: awaitingCheckin.length, cls: 'bg-slate-50 text-slate-600 border border-slate-200' },
+                        { label: 'Chờ buổi đánh kết thúc', count: awaitingFinish.length, cls: 'bg-slate-50 text-slate-600 border border-slate-200' },
                         { label: 'Chờ thanh toán', count: pending.length, cls: 'bg-amber-50 text-amber-700 border border-amber-200' },
                         { label: 'Chờ chốt thanh toán', count: pendingReview.length, cls: 'bg-blue-50 text-blue-700 border border-blue-200' },
                         { label: 'Đã xác nhận thanh toán', count: confirmed.length, cls: 'bg-green-50 text-green-700 border border-green-200' },

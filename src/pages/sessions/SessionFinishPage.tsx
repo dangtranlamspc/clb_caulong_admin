@@ -75,10 +75,13 @@ export default function SessionFinishPage() {
                 setGuestAmounts(initGuestAmounts);
 
                 const initOtherFees: Record<string, number> = {};
+                const initOtherFeeNotes: Record<string, string> = {};
                 confirmed.forEach((reg: any) => {
                     if (reg.other_fee_amount) initOtherFees[reg.id] = reg.other_fee_amount;
+                    if (reg.other_fee_note) initOtherFeeNotes[reg.id] = reg.other_fee_note;
                 });
                 setOtherFees(initOtherFees);
+                setOtherFeeNotes(initOtherFeeNotes);
             })
             .finally(() => setLoading(false));
     }, [id]);
@@ -171,6 +174,7 @@ export default function SessionFinishPage() {
                 amount: number;
                 base_amount: number;
                 other_fee_amount: number;
+                other_fee_note?: string;
             }[] = [];
 
             hostRows.forEach(h => {
@@ -181,6 +185,7 @@ export default function SessionFinishPage() {
                     amount: base + other,
                     base_amount: base,
                     other_fee_amount: other,
+                    other_fee_note: otherFeeNotes[h.id]?.trim() || undefined,
                 });
 
                 guestsOf(h.id).forEach(g => {
@@ -191,6 +196,7 @@ export default function SessionFinishPage() {
                         amount: gBase + gOther,
                         base_amount: gBase,
                         other_fee_amount: gOther,
+                        other_fee_note: otherFeeNotes[g.id]?.trim() || undefined,
                     });
                 });
             });
@@ -200,7 +206,6 @@ export default function SessionFinishPage() {
                 shuttle_count: shuttleCount,
                 shuttle_price: shuttlePrice,
                 other_fee: totalOtherFees,
-                other_fee_note: Object.values(otherFeeNotes).filter(Boolean).join(', ') || undefined,
                 amounts: allAmounts,
                 wallet_deduct: Array.from(walletDeductIds),
             });

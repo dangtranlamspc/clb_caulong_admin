@@ -1,6 +1,6 @@
-// src/components/sessions/SessionCostCard.tsx
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { sessionsApi } from '../../api';
+import { supabase } from '../../lib/supabase';
 
 function fmt(n: number) {
     return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
@@ -14,26 +14,44 @@ export default function SessionCostCard({ sessionId }: Props) {
     const [cost, setCost] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        sessionsApi.getCost(sessionId)
+    const fetchCost = useCallback(() => {
+        return sessionsApi.getCost(sessionId)
             .then(({ data }) => setCost(data))
-            .finally(() => setLoading(false));
+            .catch(() => { });
     }, [sessionId]);
+
+    useEffect(() => {
+        setLoading(true);
+        fetchCost().finally(() => setLoading(false));
+    }, [sessionId, fetchCost]);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        const channel = supabase
+            .channel(`session:${sessionId}`)
+            .on('broadcast', { event: 'session_updated' }, () => {
+                fetchCost();
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [sessionId, fetchCost]);
 
     if (loading) return <div className="card animate-pulse h-48 bg-gray-100" />;
     if (!cost) return null;
 
     const { chi_phi, paid_list, summary } = cost;
     const hasConfirmed = summary.has_confirmed;
-
-    // Breakdown khoản thu khác — lấy từ chi_phi.other_fee_list (tất cả registrations có khoản khác,
-    // bất kể đã xác nhận thanh toán hay chưa)
-    const otherFeeItems: { name: string; amount: number }[] = chi_phi.other_fee_list ?? [];
+    const otherFeeItems: {
+        name: string;
+        amount: number;
+        note?: string | null;
+        guests?: { name: string; amount: number; note?: string | null }[];
+        total?: number;
+    }[] = chi_phi.other_fee_list ?? [];
 
     return (
         <div className="space-y-3">
 
-            {/* Chi phí thực tế */}
             <div className="card space-y-2">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🔑 Chi phí thực tế</p>
 
@@ -49,7 +67,6 @@ export default function SessionCostCard({ sessionId }: Props) {
                     <span className="font-medium">{fmt(chi_phi.court_fee)}</span>
                 </div>
 
-                {/* ── Khoản thu khác — hiện tổng + chi tiết từng người nếu có ── */}
                 {chi_phi.other_fee > 0 && (
                     <div className="space-y-1">
                         <div className="flex justify-between text-sm">
@@ -62,13 +79,34 @@ export default function SessionCostCard({ sessionId }: Props) {
                             <span className="font-medium">{fmt(chi_phi.other_fee)}</span>
                         </div>
 
-                        {/* Chi tiết từng người — chỉ hiện nếu backend đã trả về breakdown */}
                         {otherFeeItems.length > 0 && (
-                            <div className="ml-4 space-y-0.5 border-l-2 border-amber-100 pl-3">
+                            <div className="ml-4 space-y-1.5 border-l-2 border-amber-100 pl-3">
                                 {otherFeeItems.map((item, i) => (
-                                    <div key={i} className="flex justify-between text-xs text-gray-500">
-                                        <span>{item.name}</span>
-                                        <span className="font-medium text-amber-600">{fmt(item.amount)}</span>
+                                    <div key={i}>
+                                        <div className="flex justify-between text-xs text-gray-500">
+                                            <span>
+                                                {item.name}
+                                                {item.note && <span className="text-gray-400 italic"> — {item.note}</span>}
+                                            </span>
+                                            <span className="font-medium text-amber-600">{fmt(item.amount)}</span>
+                                        </div>
+
+                                        {item.guests?.map((g, gi) => (
+                                            <div key={gi} className="flex justify-between text-xs text-gray-400 pl-3 mt-0.5">
+                                                <span>
+                                                    + {g.name} <span className="text-gray-300">(đi cùng)</span>
+                                                    {g.note && <span className="italic"> — {g.note}</span>}
+                                                </span>
+                                                <span className="font-medium text-amber-500">{fmt(g.amount)}</span>
+                                            </div>
+                                        ))}
+
+                                        {item.guests && item.guests.length > 0 && (
+                                            <div className="flex justify-between text-[11px] text-gray-400 pl-3 mt-0.5 pt-0.5 border-t border-dashed border-gray-200">
+                                                <span>= Tổng ({item.name})</span>
+                                                <span className="font-semibold text-amber-700">{fmt(item.total ?? item.amount)}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -82,7 +120,6 @@ export default function SessionCostCard({ sessionId }: Props) {
                 </div>
             </div>
 
-            {/* Đã thu được */}
             {hasConfirmed ? (
                 <div className="card space-y-2">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">💰 Đã thu được</p>
@@ -127,7 +164,6 @@ export default function SessionCostCard({ sessionId }: Props) {
                 </div>
             )}
 
-            {/* Còn thiếu / dư */}
             {hasConfirmed && (
                 <div className={`card space-y-1 border ${summary.remaining > 0 ? 'border-purple-200 bg-purple-50' : 'border-green-200 bg-green-50'}`}>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ℹ️ Kết quả</p>
