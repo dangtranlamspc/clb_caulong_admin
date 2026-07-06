@@ -269,7 +269,6 @@ export default function SessionFinishPage() {
                 </div>
             </div>
 
-            {/* Legend thanh toán */}
             <div className="flex items-center gap-4 px-1 text-xs text-gray-400">
                 <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded border-2 border-gray-300" />
@@ -282,7 +281,6 @@ export default function SessionFinishPage() {
                 </div>
             </div>
 
-            {/* Số tiền từng người */}
             <div className="card !p-0 overflow-hidden">
                 <div className="flex items-center justify-between px-4 pt-4 pb-3">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Số tiền từng người phải trả</p>
