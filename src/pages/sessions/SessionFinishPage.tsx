@@ -42,6 +42,13 @@ export default function SessionFinishPage() {
 
     const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
 
+    const [walletModes, setWalletModes] = useState<Record<string, 'member_choice' | 'grouped' | 'separate'>>({});
+
+
+    const setWalletMode = (registrationId: string, mode: 'member_choice' | 'grouped' | 'separate') => {
+        setWalletModes(prev => ({ ...prev, [registrationId]: mode }));
+    };
+
     useEffect(() => {
         Promise.all([sessionsApi.get(id), sessionsApi.getRegistrations(id)])
             .then(([{ data: s }, { data: r }]) => {
@@ -208,6 +215,11 @@ export default function SessionFinishPage() {
                 other_fee: totalOtherFees,
                 amounts: allAmounts,
                 wallet_deduct: Array.from(walletDeductIds),
+                wallet_deduct_modes: Object.fromEntries(
+                    Array.from(walletDeductIds)
+                        .filter(regId => guestsOf(regId).length > 0)
+                        .map(regId => [regId, walletModes[regId] ?? 'member_choice'])
+                ),
             });
             toast.success('Đã kết thúc buổi và gửi hóa đơn thanh toán!');
             navigate(`/sessions/${id}`);
@@ -269,18 +281,6 @@ export default function SessionFinishPage() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-4 px-1 text-xs text-gray-400">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded border-2 border-gray-300" />
-                    <span>Tự thanh toán</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded bg-blue-600" />
-                    <Wallet className="w-3 h-3 text-blue-600" />
-                    <span>Trừ thẳng ví BNB</span>
-                </div>
-            </div>
-
             <div className="card !p-0 overflow-hidden">
                 <div className="flex items-center justify-between px-4 pt-4 pb-3">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Số tiền từng người phải trả</p>
@@ -300,10 +300,7 @@ export default function SessionFinishPage() {
                         const isWalletDeduct = walletDeductIds.has(h.id);
 
                         return (
-                            <div
-                                key={h.id}
-                                className={`px-4 py-3 space-y-2 transition-colors ${isWalletDeduct ? 'bg-blue-50/40' : ''}`}
-                            >
+                            <div key={h.id} className={`px-4 py-3 space-y-2 transition-colors ${isWalletDeduct ? 'bg-blue-50/40' : ''}`}>
                                 <div className="flex items-center gap-3">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
@@ -317,11 +314,6 @@ export default function SessionFinishPage() {
                                                 </span>
                                             )}
                                         </div>
-                                        {guests.length > 0 && isWalletDeduct && (
-                                            <p className="text-[10px] text-blue-500 mt-0.5">
-                                                ⓘ Có {guests.length} khách đi cùng — member sẽ chọn gộp/riêng sau
-                                            </p>
-                                        )}
                                     </div>
 
                                     <input
@@ -346,6 +338,37 @@ export default function SessionFinishPage() {
                                         </button>
                                     )}
                                 </div>
+
+                                {/* Chọn chế độ ví — full width, tách riêng khỏi hàng trên để không bị ép trên mobile */}
+                                {guests.length > 0 && isWalletDeduct && (
+                                    <div className="pt-1">
+                                        <p className="text-[11px] font-medium text-gray-400 mb-1.5">
+                                            Cách xử lý thanh toán cho khách đi cùng
+                                        </p>
+                                        <div className="grid grid-cols-3 gap-1 p-1 bg-gray-100 rounded-xl">
+                                            {[
+                                                { val: 'member_choice', label: 'Member tự chọn' },
+                                                { val: 'grouped', label: 'Gộp trừ ví' },
+                                                { val: 'separate', label: 'Tách riêng' },
+                                            ].map(({ val, label }) => {
+                                                const active = (walletModes[h.id] ?? 'member_choice') === val;
+                                                return (
+                                                    <button
+                                                        key={val}
+                                                        type="button"
+                                                        onClick={() => setWalletMode(h.id, val as any)}
+                                                        className={`px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium text-center leading-tight transition-all ${active
+                                                            ? 'bg-blue-600 text-white shadow-sm'
+                                                            : 'text-gray-500 hover:bg-gray-200/70'
+                                                            }`}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 flex-shrink-0" />

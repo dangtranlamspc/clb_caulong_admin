@@ -77,6 +77,8 @@ export const sessionsApi = {
 
 export const registrationsApi = {
   list: (params?: any) => api.get('/registrations', { params }),
+  approveRegistration: (id: string) => api.patch(`/registrations/${id}/approve`),
+  rejectRegistrationRequest: (id: string) => api.patch(`/registrations/${id}/reject-registration`),
   confirm: (id: string, notes?: string) => api.patch(`/registrations/${id}/confirm`, { notes }),
   reject: (id: string, notes?: string) => api.patch(`/registrations/${id}/reject`, { notes }),
   setAmount: (id: string, amount: number) => api.patch(`/registrations/${id}/amount`, { amount }),

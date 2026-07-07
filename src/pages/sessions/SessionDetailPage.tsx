@@ -15,9 +15,11 @@ import { sessionsApi, registrationsApi, usersApi } from '../../api';
 import SessionCostCard from './SessionCostCard';
 import { MorphButton } from '../../components/MorphButton';
 import { supabase } from '../../lib/supabase';
+import { createPortal } from 'react-dom';
 
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> = {
+    pendingApproval: { label: 'Chờ duyệt', cls: 'bg-orange-50 text-orange-600 border-orange-200', icon: Hourglass },
     pending: { label: 'Chờ thanh toán', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Hourglass },
     pendingReview: { label: 'Chờ chốt thanh toán', cls: 'bg-blue-50 text-blue-700 border-blue-200', icon: Eye },
     confirmed: { label: 'Đã xác nhận thanh toán', cls: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2 },
@@ -55,7 +57,7 @@ export default function SessionDetailPage() {
     const [search, setSearch] = useState('');
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [searching, setSearching] = useState(false);
-    const [selectedMember, setSelectedMember] = useState<any>(null);
+    const [selectedMembers, setSelectedMembers] = useState<any[]>([]);
     const [addConfirmNow, setAddConfirmNow] = useState(false);
     const [addNotes, setAddNotes] = useState('');
     const [adding, setAdding] = useState(false);
@@ -104,8 +106,7 @@ export default function SessionDetailPage() {
     }, [id]);
 
     useEffect(() => {
-        if (!showAddModal) return;
-        if (search.trim().length < 2) { setSearchResults([]); return; }
+        if (!showAddModal || addTab !== 'account') return;
         const t = setTimeout(async () => {
             setSearching(true);
             try {
@@ -114,9 +115,27 @@ export default function SessionDetailPage() {
             } finally {
                 setSearching(false);
             }
-        }, 350);
+        }, 300);
         return () => clearTimeout(t);
-    }, [search, showAddModal]);
+    }, [search, showAddModal, addTab]);
+
+    const handleApproveRegistration = (regId: string) =>
+        runAction(
+            `${regId}:approve`, regId,
+            () => registrationsApi.approveRegistration(regId),
+            'Đã duyệt đăng ký',
+            'Duyệt thất bại',
+        );
+
+    const handleRejectRegistration = (regId: string, displayName: string) => {
+        if (!confirm(`Từ chối đăng ký của ${displayName}?`)) return;
+        runAction(
+            `${regId}:rejectReg`, regId,
+            () => registrationsApi.rejectRegistrationRequest(regId),
+            'Đã từ chối đăng ký',
+            'Thao tác thất bại',
+        );
+    };
 
     const handleConfirm = (regId: string) =>
         runAction(
@@ -197,7 +216,7 @@ export default function SessionDetailPage() {
         setShowAddModal(false);
         setSearch('');
         setSearchResults([]);
-        setSelectedMember(null);
+        setSelectedMembers([]);
         setAddConfirmNow(false);
         setAddNotes('');
         setAddTab('account');
@@ -210,11 +229,27 @@ export default function SessionDetailPage() {
         setAdding(true);
         try {
             if (addTab === 'account') {
-                if (!selectedMember) return;
-                await registrationsApi.adminAdd({
-                    session_id: id, user_id: selectedMember.id, notes: addNotes || undefined,
-                });
-                toast.success(`Đã gửi lời mời tham gia đến ${selectedMember.full_name}`);
+                if (selectedMembers.length === 0) return;
+
+                const results = await Promise.allSettled(
+                    selectedMembers.map(m =>
+                        registrationsApi.adminAdd({
+                            session_id: id,
+                            user_id: m.id,
+                            notes: addNotes || undefined,
+                        })
+                    )
+                );
+
+                const succeeded = results.filter(r => r.status === 'fulfilled').length;
+                const failed = results.length - succeeded;
+
+                if (succeeded > 0) {
+                    toast.success(`Đã thêm ${succeeded} thành viên vào buổi`);
+                }
+                if (failed > 0) {
+                    toast.error(`${failed} thành viên thêm thất bại (có thể đã đăng ký buổi này)`);
+                }
             } else {
                 await registrationsApi.adminAdd({
                     session_id: id,
@@ -277,6 +312,7 @@ export default function SessionDetailPage() {
 
     const confirmed = registrations.filter(r => r.payment_status === 'confirmed');
     const rejected = registrations.filter(r => r.payment_status === 'rejected');
+    const pendingApproval = registrations.filter(r => r.participation_status === 'pending_approval');
     const awaitingCheckin = registrations.filter(r => r.participation_status === 'awaiting_checkin');
 
     const hostRegs = registrations.filter(r => !r.host_registration_id);
@@ -302,13 +338,15 @@ export default function SessionDetailPage() {
             && reg.amount_override == null
             && !isPendingReview;
 
-        const cfg = reg.participation_status === 'awaiting_checkin'
-            ? STATUS_CONFIG.awaitingCheckin
-            : isAwaitingFinish
-                ? STATUS_CONFIG.awaitingFinish
-                : isPendingReview
-                    ? STATUS_CONFIG.pendingReview
-                    : (STATUS_CONFIG[reg.payment_status] ?? STATUS_CONFIG.pending);
+        const cfg = reg.participation_status === 'pending_approval'
+            ? STATUS_CONFIG.pendingApproval
+            : reg.participation_status === 'awaiting_checkin'
+                ? STATUS_CONFIG.awaitingCheckin
+                : isAwaitingFinish
+                    ? STATUS_CONFIG.awaitingFinish
+                    : isPendingReview
+                        ? STATUS_CONFIG.pendingReview
+                        : (STATUS_CONFIG[reg.payment_status] ?? STATUS_CONFIG.pending);
         const StatusIcon = cfg.icon;
         const busy = actionId === reg.id;
         const user = reg.users;
@@ -329,9 +367,31 @@ export default function SessionDetailPage() {
         const presentPhase = getPhase(`${reg.id}:present`);
         const absentPhase = getPhase(`${reg.id}:absent`);
         const confirmPhase = getPhase(`${reg.id}:confirm`);
+        const approvePhase = getPhase(`${reg.id}:approve`);
+        const rejectRegPhase = getPhase(`${reg.id}:rejectReg`);
 
 
-        const actionsNode = reg.participation_status === 'awaiting_checkin' ? (
+        const actionsNode = reg.participation_status === 'pending_approval' ? (
+            <>
+                <MorphButton
+                    phase={approvePhase}
+                    idleIcon={<CheckCircle2 className="w-4 h-4" />}
+                    label="Duyệt"
+                    colorClass="bg-blue-500 hover:bg-blue-600 text-white"
+                    onClick={() => handleApproveRegistration(reg.id)}
+                    disabled={busy}
+                />
+                <MorphButton
+                    phase={rejectRegPhase}
+                    idleIcon={<XCircle className="w-4 h-4" />}
+                    label="Từ chối"
+                    colorClass="bg-red-100 hover:bg-red-200 text-red-600"
+                    successColorClass="bg-red-500 text-white"
+                    onClick={() => handleRejectRegistration(reg.id, displayName)}
+                    disabled={busy}
+                />
+            </>
+        ) : reg.participation_status === 'awaiting_checkin' ? (
             <>
                 <MorphButton
                     phase={presentPhase}
@@ -534,6 +594,15 @@ export default function SessionDetailPage() {
                 .morph-tick {
                     animation: morphTickPop 0.3s ease-out;
                 }
+
+                @keyframes badgePop {
+                    0%   { transform: scale(0.7) translateY(-4px); opacity: 0; }
+                    60%  { transform: scale(1.05) translateY(0); opacity: 1; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+                .badge-pop {
+                    animation: badgePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
             `}</style>
             <div className="max-w-3xl mx-auto space-y-4">
                 {/* Header */}
@@ -543,12 +612,14 @@ export default function SessionDetailPage() {
                     </button>
                     <h1 className="text-xl font-bold text-gray-900 flex-1 min-w-[100px] truncate">{session.title}</h1>
 
-                    {canAddMember && awaitingCheckin.length > 0 && (
+                    {canAddMember && (awaitingCheckin.length > 0 || pendingApproval.length > 0) && (
                         <span className="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg flex-shrink-0">
-                            Còn {awaitingCheckin.length} người chưa điểm danh
+                            {pendingApproval.length > 0 && `Còn ${pendingApproval.length} đăng ký chờ duyệt`}
+                            {pendingApproval.length > 0 && awaitingCheckin.length > 0 && ', '}
+                            {awaitingCheckin.length > 0 && `${awaitingCheckin.length} người chưa điểm danh`}
                         </span>
                     )}
-                    {canAddMember && awaitingCheckin.length === 0 && (
+                    {canAddMember && awaitingCheckin.length === 0 && pendingApproval.length === 0 && (
                         <Link
                             to={`/sessions/${id}/finish`}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors flex-shrink-0"
@@ -625,17 +696,23 @@ export default function SessionDetailPage() {
                 {/* Summary badges */}
                 <div className="flex gap-3 flex-wrap">
                     {[
+                        { label: 'Chờ duyệt', count: pendingApproval.length, cls: 'bg-orange-50 text-orange-600 border border-orange-200' },
                         { label: 'Chờ điểm danh', count: awaitingCheckin.length, cls: 'bg-slate-50 text-slate-600 border border-slate-200' },
                         { label: 'Chờ buổi đánh kết thúc', count: awaitingFinish.length, cls: 'bg-slate-50 text-slate-600 border border-slate-200' },
                         { label: 'Chờ thanh toán', count: pending.length, cls: 'bg-amber-50 text-amber-700 border border-amber-200' },
                         { label: 'Chờ chốt thanh toán', count: pendingReview.length, cls: 'bg-blue-50 text-blue-700 border border-blue-200' },
                         { label: 'Đã xác nhận thanh toán', count: confirmed.length, cls: 'bg-green-50 text-green-700 border border-green-200' },
                         { label: 'Thanh toán bị từ chối', count: rejected.length, cls: 'bg-red-50 text-red-600 border border-red-200' },
-                    ].map(({ label, count, cls }) => (
-                        <span key={label} className={`px-3 py-1 rounded-full text-sm font-medium ${cls}`}>
-                            {label}: {count}
-                        </span>
-                    ))}
+                    ]
+                        .filter(({ count }) => count > 0)
+                        .map(({ label, count, cls }) => (
+                            <span
+                                key={label}
+                                className={`badge-pop px-3 py-1 rounded-full text-sm font-medium ${cls}`}
+                            >
+                                {label}: {count}
+                            </span>
+                        ))}
                 </div>
 
                 <div className="card !p-0 overflow-hidden">
@@ -659,229 +736,224 @@ export default function SessionDetailPage() {
                     )}
                 </div>
 
-                {
-                    viewingBillUrl && (
-                        <div
-                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-                            onClick={() => setViewingBillUrl(null)}
-                        >
-                            <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
-                                <button
-                                    onClick={() => setViewingBillUrl(null)}
-                                    className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
-                                    title="Đóng"
-                                >
-                                    <XCircle className="w-7 h-7" />
-                                </button>
-                                <img
-                                    src={viewingBillUrl}
-                                    alt="Ảnh bill chuyển khoản"
-                                    className="w-full max-h-[80vh] object-contain rounded-xl bg-white"
-                                />
-                            </div>
+                {viewingBillUrl && typeof document !== 'undefined' && createPortal(
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                        onClick={() => setViewingBillUrl(null)}
+                    >
+                        <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
+                            <button
+                                onClick={() => setViewingBillUrl(null)}
+                                className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
+                                title="Đóng"
+                            >
+                                <XCircle className="w-7 h-7" />
+                            </button>
+                            <img
+                                src={viewingBillUrl}
+                                alt="Ảnh bill chuyển khoản"
+                                className="w-full max-h-[80vh] object-contain rounded-xl bg-white"
+                            />
                         </div>
-                    )
-                }
+                    </div>,
+                    document.body
+                )}
 
                 {/* ── Add member modal ── */}
-                {
-                    showAddModal && (
+                {showAddModal && typeof document !== 'undefined' && createPortal(
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                        onClick={closeAddModal}
+                    >
                         <div
-                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-                            onClick={closeAddModal}
+                            className="bg-white rounded-2xl w-full max-w-md shadow-xl"
+                            onClick={e => e.stopPropagation()}
                         >
-                            <div
-                                className="bg-white rounded-2xl w-full max-w-md shadow-xl"
-                                onClick={e => e.stopPropagation()}
-                            >
-                                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                                    <h3 className="font-bold text-gray-900">Thêm thành viên vào buổi</h3>
-                                    <button onClick={closeAddModal} className="p-1 text-gray-400 hover:text-gray-600">
-                                        <XCircle className="w-5 h-5" />
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                                <h3 className="font-bold text-gray-900">Thêm thành viên vào buổi</h3>
+                                <button onClick={closeAddModal} className="p-1 text-gray-400 hover:text-gray-600">
+                                    <XCircle className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="flex gap-1 px-5 pt-3">
+                                {[['account', 'Có tài khoản'], ['guest', 'Khách không tài khoản']].map(([val, lbl]) => (
+                                    <button key={val} onClick={() => setAddTab(val as any)}
+                                        className={`flex-1 py-1.5 rounded-lg text-sm font-medium ${addTab === val ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>
+                                        {lbl}
                                     </button>
-                                </div>
+                                ))}
+                            </div>
 
-                                <div className="flex gap-1 px-5 pt-3">
-                                    {[['account', 'Có tài khoản'], ['guest', 'Khách không tài khoản']].map(([val, lbl]) => (
-                                        <button key={val} onClick={() => setAddTab(val as any)}
-                                            className={`flex-1 py-1.5 rounded-lg text-sm font-medium ${addTab === val ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>
-                                            {lbl}
-                                        </button>
-                                    ))}
-                                </div>
+                            <div className="p-5 space-y-4">
+                                {addTab === 'account' ? (
+                                    <>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                            <input
+                                                autoFocus
+                                                value={search}
+                                                onChange={e => setSearch(e.target.value)}
+                                                className="input-field pl-9"
+                                                placeholder="Tìm theo tên hoặc số điện thoại..."
+                                            />
+                                        </div>
 
-                                <div className="p-5 space-y-4">
-                                    {addTab === 'account' ? (
-                                        !selectedMember ? (
-                                            <>
-                                                <div className="relative">
-                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                                    <input
-                                                        autoFocus
-                                                        value={search}
-                                                        onChange={e => setSearch(e.target.value)}
-                                                        className="input-field pl-9"
-                                                        placeholder="Tìm theo tên hoặc số điện thoại..."
-                                                    />
-                                                </div>
-                                                <div className="max-h-60 overflow-y-auto -mx-1">
-                                                    {searching ? (
-                                                        <p className="text-sm text-gray-400 text-center py-4">Đang tìm...</p>
-                                                    ) : search.trim().length < 2 ? (
-                                                        <p className="text-sm text-gray-400 text-center py-4">Nhập ít nhất 2 ký tự để tìm</p>
-                                                    ) : searchResults.length === 0 ? (
-                                                        <p className="text-sm text-gray-400 text-center py-4">Không tìm thấy thành viên</p>
-                                                    ) : (
-                                                        <ul className="space-y-1">
-                                                            {searchResults.map(m => (
-                                                                <li key={m.id}>
-                                                                    <button
-                                                                        onClick={() => setSelectedMember(m)}
-                                                                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-left transition-colors"
-                                                                    >
-                                                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-700">
-                                                                            {m.full_name?.[0]?.toUpperCase() ?? '?'}
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
-                                                                            <p className="text-xs text-gray-400">{m.phone}</p>
-                                                                        </div>
-                                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${m.member_type === 'co_dinh'
-                                                                            ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                                            : 'bg-gray-50 text-gray-500 border-gray-200'
-                                                                            }`}>
-                                                                            {m.member_type === 'co_dinh' ? 'Thành viên' : 'Vãng lai'}
-                                                                        </span>
-                                                                    </button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-3">
-                                                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-blue-700">
-                                                        {selectedMember.full_name?.[0]?.toUpperCase() ?? '?'}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-semibold text-gray-900 truncate">{selectedMember.full_name}</p>
-                                                        <p className="text-xs text-gray-500">{selectedMember.phone}</p>
-                                                    </div>
-                                                    <button onClick={() => setSelectedMember(null)} className="text-xs text-blue-600 font-medium flex-shrink-0">
-                                                        Đổi
-                                                    </button>
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tuỳ chọn)</label>
-                                                    <input
-                                                        value={addNotes}
-                                                        onChange={e => setAddNotes(e.target.value)}
-                                                        className="input-field"
-                                                        placeholder="VD: Khách vãng lai đăng ký trực tiếp"
-                                                    />
-                                                </div>
-
-                                                <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
-                                                    ⓘ Thành viên sẽ nhận được thông báo đã được thêm vào buổi. Thanh toán sau khi buổi kết thúc.
-                                                </p>
-                                            </>
-                                        )
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Họ tên *</label>
-                                                <input
-                                                    value={guestForm.full_name}
-                                                    onChange={e => setGuestForm(f => ({ ...f, full_name: e.target.value }))}
-                                                    className="input-field"
-                                                    placeholder="Tên khách"
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
-                                                    <select
-                                                        value={guestForm.gender}
-                                                        onChange={e => setGuestForm(f => ({ ...f, gender: e.target.value }))}
-                                                        className="input-field"
+                                        {selectedMembers.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {selectedMembers.map(m => (
+                                                    <span
+                                                        key={m.id}
+                                                        className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium"
                                                     >
-                                                        <option value="male">Nam</option>
-                                                        <option value="female">Nữ</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Trình độ</label>
-                                                    <select
-                                                        value={guestForm.skill_level}
-                                                        onChange={e => setGuestForm(f => ({ ...f, skill_level: e.target.value }))}
-                                                        className="input-field"
-                                                    >
-                                                        <option value="">-- Chọn --</option>
-                                                        <option value="yeu">Yếu</option>
-                                                        <option value="trung_binh_yeu">TB Yếu</option>
-                                                        <option value="trung_binh">Trung bình</option>
-                                                        <option value="trung_binh_cong">TB+</option>
-                                                        <option value="ban_chuyen">Bán chuyên</option>
-                                                        <option value="chuyen_nghiep">Chuyên nghiệp</option>
-                                                    </select>
-                                                </div>
+                                                        {m.full_name}
+                                                        <button
+                                                            onClick={() => setSelectedMembers(prev => prev.filter(x => x.id !== m.id))}
+                                                            className="w-4 h-4 rounded-full hover:bg-blue-200 flex items-center justify-center"
+                                                        >
+                                                            <XCircle className="w-3 h-3" />
+                                                        </button>
+                                                    </span>
+                                                ))}
                                             </div>
+                                        )}
+
+                                        <div className="max-h-72 overflow-y-auto -mx-1 border border-gray-100 rounded-xl">
+                                            {searching ? (
+                                                <p className="text-sm text-gray-400 text-center py-4">Đang tìm...</p>
+                                            ) : searchResults.length === 0 ? (
+                                                <p className="text-sm text-gray-400 text-center py-4">Không tìm thấy thành viên</p>
+                                            ) : (
+                                                <ul className="divide-y divide-gray-50">
+                                                    {searchResults.map(m => {
+                                                        const isSelected = selectedMembers.some(x => x.id === m.id);
+                                                        return (
+                                                            <li key={m.id}>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedMembers(prev =>
+                                                                            isSelected
+                                                                                ? prev.filter(x => x.id !== m.id)
+                                                                                : [...prev, m]
+                                                                        );
+                                                                    }}
+                                                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                                                                        }`}
+                                                                >
+                                                                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                                                                        }`}>
+                                                                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                                                                    </div>
+                                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-700">
+                                                                        {m.full_name?.[0]?.toUpperCase() ?? '?'}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
+                                                                        <p className="text-xs text-gray-400">{m.phone}</p>
+                                                                    </div>
+                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${m.member_type === 'co_dinh'
+                                                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                        : 'bg-gray-50 text-gray-500 border-gray-200'
+                                                                        }`}>
+                                                                        {m.member_type === 'co_dinh' ? 'Thành viên' : 'Vãng lai'}
+                                                                    </span>
+                                                                </button>
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                            )}
+                                        </div>
+
+                                        <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+                                            ⓘ Đã chọn {selectedMembers.length} thành viên. Mỗi người sẽ nhận được thông báo đã được thêm vào buổi. Thanh toán sau khi buổi kết thúc.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Họ tên *</label>
+                                            <input
+                                                value={guestForm.full_name}
+                                                onChange={e => setGuestForm(f => ({ ...f, full_name: e.target.value }))}
+                                                className="input-field"
+                                                placeholder="Tên khách"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                    Đi cùng (tuỳ chọn, để gộp tiền)
-                                                </label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
                                                 <select
-                                                    value={hostRegId}
-                                                    onChange={e => setHostRegId(e.target.value)}
+                                                    value={guestForm.gender}
+                                                    onChange={e => setGuestForm(f => ({ ...f, gender: e.target.value }))}
                                                     className="input-field"
                                                 >
-                                                    <option value="">-- Không, tính tiền riêng --</option>
-                                                    {registrations.filter(r => !r.is_guest).map((r: any) => (
-                                                        <option key={r.id} value={r.id}>{r.users?.full_name}</option>
-                                                    ))}
+                                                    <option value="male">Nam</option>
+                                                    <option value="female">Nữ</option>
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tuỳ chọn)</label>
-                                                <input
-                                                    value={addNotes}
-                                                    onChange={e => setAddNotes(e.target.value)}
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Trình độ</label>
+                                                <select
+                                                    value={guestForm.skill_level}
+                                                    onChange={e => setGuestForm(f => ({ ...f, skill_level: e.target.value }))}
                                                     className="input-field"
-                                                />
+                                                >
+                                                    <option value="">-- Chọn --</option>
+                                                    <option value="yeu">Yếu</option>
+                                                    <option value="trung_binh_yeu">TB Yếu</option>
+                                                    <option value="trung_binh">Trung bình</option>
+                                                    <option value="trung_binh_cong">TB+</option>
+                                                    <option value="ban_chuyen">Bán chuyên</option>
+                                                    <option value="chuyen_nghiep">Chuyên nghiệp</option>
+                                                </select>
                                             </div>
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={guestPaidNow}
-                                                    onChange={e => setGuestPaidNow(e.target.checked)}
-                                                    className="w-4 h-4 rounded text-blue-600"
-                                                />
-                                                <span className="text-sm text-gray-700">Đã thu tiền mặt tại sân ngay</span>
-                                            </label>
                                         </div>
-                                    )}
-                                </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Đi cùng (tuỳ chọn, để gộp tiền)
+                                            </label>
+                                            <select
+                                                value={hostRegId}
+                                                onChange={e => setHostRegId(e.target.value)}
+                                                className="input-field"
+                                            >
+                                                <option value="">-- Không, tính tiền riêng --</option>
+                                                {registrations.filter(r => !r.is_guest).map((r: any) => (
+                                                    <option key={r.id} value={r.id}>{r.users?.full_name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tuỳ chọn)</label>
+                                            <input
+                                                value={addNotes}
+                                                onChange={e => setAddNotes(e.target.value)}
+                                                className="input-field"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
-                                <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100">
-                                    <button onClick={closeAddModal} className="btn-secondary text-sm">Hủy</button>
-                                    <button
-                                        onClick={handleAddMember}
-                                        disabled={
-                                            adding ||
-                                            (addTab === 'account' ? !selectedMember : !guestForm.full_name.trim())
-                                        }
-                                        className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
-                                    >
-                                        {adding && <Loader2 className="w-4 h-4 animate-spin" />}
-                                        Thêm vào buổi
-                                    </button>
-                                </div>
+                            <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100">
+                                <button onClick={closeAddModal} className="btn-secondary text-sm">Hủy</button>
+                                <button
+                                    onClick={handleAddMember}
+                                    disabled={
+                                        adding ||
+                                        (addTab === 'account' ? selectedMembers.length === 0 : !guestForm.full_name.trim())
+                                    }
+                                    className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {adding && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Thêm vào buổi{addTab === 'account' && selectedMembers.length > 1 ? ` (${selectedMembers.length})` : ''}
+                                </button>
                             </div>
                         </div>
-                    )
+                    </div>,
+                    document.body
+                )
                 }
             </div >
         </>
