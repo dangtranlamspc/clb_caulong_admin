@@ -128,8 +128,17 @@ function MemberPanel({ member, onClose, onChanged, onSelectTx }: {
         <div className="flex flex-col h-full bg-white lg:border-l border-gray-100">
             <div className="flex items-start justify-between p-4 sm:p-5 border-b border-gray-100">
                 <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-base sm:text-lg font-bold text-white flex-shrink-0">
-                        {member.full_name[0]}
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-base sm:text-lg font-bold text-white flex-shrink-0 overflow-hidden">
+                        {member.avatar_url ? (
+                            <img
+                                src={member.avatar_url}
+                                alt={member.full_name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
+                        ) : (
+                            member.full_name[0]
+                        )}
                     </div>
                     <div className="min-w-0">
                         <p className="font-bold text-gray-900 truncate">{member.full_name}</p>
@@ -511,8 +520,17 @@ export default function WalletAdminSummaryPage() {
                                         >
                                             <td className="px-4 sm:px-5 py-3">
                                                 <div className="flex items-center gap-2.5">
-                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
-                                                        {m.full_name[0]}
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0 overflow-hidden">
+                                                        {m.avatar_url ? (
+                                                            <img
+                                                                src={m.avatar_url}
+                                                                alt={m.full_name}
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                                            />
+                                                        ) : (
+                                                            m.full_name[0]
+                                                        )}
                                                     </div>
                                                     <div className="min-w-0">
                                                         <p className="font-semibold text-gray-900 truncate">{m.full_name}</p>

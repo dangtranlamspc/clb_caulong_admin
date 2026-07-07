@@ -60,6 +60,7 @@ export const usersApi = {
   dashboard: () => api.get('/users/dashboard'),
   export: (params?: any) => api.get('/users/export', { params, responseType: 'blob' }),
   searchMembers: (q: string) => api.get('/users/search/members', { params: { q } }),
+  memberTypeCounts: () => api.get('/users/member-type-counts'),
 };
 
 export const sessionsApi = {

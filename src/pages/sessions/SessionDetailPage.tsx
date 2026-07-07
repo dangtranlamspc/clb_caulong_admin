@@ -454,10 +454,21 @@ export default function SessionDetailPage() {
                             <CornerDownRight className="w-4 h-4 text-gray-300 mt-1.5 flex-shrink-0" />
                         )}
 
-                        <div className={`rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 ${isNested ? 'w-7 h-7' : 'w-9 h-9'}`}>
-                            <span className={`text-blue-700 font-semibold ${isNested ? 'text-xs' : 'text-sm'}`}>
-                                {displayName?.[0]?.toUpperCase() ?? '?'}
-                            </span>
+                        <div className={`rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 overflow-hidden ${isNested ? 'w-7 h-7' : 'w-9 h-9'}`}>
+                            {user?.avatar_url ? (
+                                <img
+                                    src={user.avatar_url}
+                                    alt={displayName}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                    }}
+                                />
+                            ) : (
+                                <span className={`text-blue-700 font-semibold ${isNested ? 'text-xs' : 'text-sm'}`}>
+                                    {displayName?.[0]?.toUpperCase() ?? '?'}
+                                </span>
+                            )}
                         </div>
 
                         <div className="flex-1 min-w-0">
@@ -844,8 +855,19 @@ export default function SessionDetailPage() {
                                                                         }`}>
                                                                         {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                                                                     </div>
-                                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-blue-700">
-                                                                        {m.full_name?.[0]?.toUpperCase() ?? '?'}
+                                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                                                        {m.avatar_url ? (
+                                                                            <img
+                                                                                src={m.avatar_url}
+                                                                                alt={m.full_name}
+                                                                                className="w-full h-full object-cover"
+                                                                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-xs font-semibold text-blue-700">
+                                                                                {m.full_name?.[0]?.toUpperCase() ?? '?'}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex-1 min-w-0">
                                                                         <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
