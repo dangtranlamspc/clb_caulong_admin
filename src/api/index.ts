@@ -130,4 +130,11 @@ export const walletAdminApi = {
   listTopupRequests: (params?: any) => api.get('/wallet/admin/topup-requests', { params }),
   approveTopup: (id: string) => api.patch(`/wallet/admin/topup-requests/${id}/approve`),
   rejectTopup: (id: string, reason: string) => api.patch(`/wallet/admin/topup-requests/${id}/reject`, { reason }),
+  getMonthlyFinance: (params?: { month?: number; year?: number }) =>
+    api.get('/wallet/admin/monthly-finance', { params }),
+
+  getFinanceHistory: (params?: { months?: number; year?: number }) =>
+    api.get('/wallet/admin/finance-history', { params }),
+
+  getFinanceYears: () => api.get('/wallet/admin/finance-years'),
 };
