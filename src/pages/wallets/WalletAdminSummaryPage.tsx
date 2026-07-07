@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { walletAdminApi } from '../../api';
+import AdminTransactionDetailModal from '../../components/wallets/AdminTransactionDetailModal';
 
 function fmt(n: number) {
     return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
@@ -70,7 +71,11 @@ function StatusBadge({ balance }: { balance: number }) {
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 whitespace-nowrap">Bình thường</span>;
 }
 
-function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () => void; onChanged: (newBalance?: number) => void }) {
+function MemberPanel({ member, onClose, onChanged, onSelectTx }: {
+    member: any;
+    onClose: () => void; onChanged: (newBalance?: number) => void;
+    onSelectTx: (tx: any) => void;
+}) {
     const [showTopup, setShowTopup] = useState(false);
     const [showAdjust, setShowAdjust] = useState(false);
     const [amountDisplay, setAmountDisplay] = useState('');
@@ -208,8 +213,12 @@ function MemberPanel({ member, onClose, onChanged }: { member: any; onClose: () 
                         <table className="w-full text-xs sm:text-sm">
                             <tbody>
                                 {transactions.map((tx: any) => (
-                                    <tr key={tx.id} className="hover:bg-gray-50 border-b border-gray-50 animate-row-fade">
-                                        <td className="px-4 sm:px-5 py-2.5 text-xs text-gray-400 whitespace-nowrap">
+                                    <tr
+                                        key={tx.id}
+                                        onClick={() => onSelectTx(tx)}
+                                        className="hover:bg-gray-50 border-b border-gray-50 animate-row-fade">
+                                        <td className="px-4 sm:px-5 py-2.5 text-xs text-gray-400 whitespace-nowrap"
+                                        >
                                             {format(new Date(tx.created_at), 'dd/MM/yyyy', { locale: vi })}
                                         </td>
                                         <td className="px-2 py-2.5 text-gray-700">{tx.title}</td>
@@ -251,6 +260,8 @@ export default function WalletAdminSummaryPage() {
 
     const [panelMember, setPanelMember] = useState<any | null>(null);
     const [panelOpen, setPanelOpen] = useState(false);
+
+    const [selectedTx, setSelectedTx] = useState<any>(null);
 
     const fetchSummary = useCallback(async () => {
         const { data } = await walletAdminApi.getSummary();
@@ -586,10 +597,14 @@ export default function WalletAdminSummaryPage() {
                                             fetchMembers();
                                             fetchSummary();
                                         }}
+                                        onSelectTx={(tx) => setSelectedTx(tx)}
                                     />
                                 </div>
                             </div>
                         </>
+                    )}
+                    {selectedTx && (
+                        <AdminTransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
                     )}
                 </div>
             </div>
