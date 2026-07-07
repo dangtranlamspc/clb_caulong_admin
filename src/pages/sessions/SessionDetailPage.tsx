@@ -594,6 +594,15 @@ export default function SessionDetailPage() {
                 .morph-tick {
                     animation: morphTickPop 0.3s ease-out;
                 }
+
+                @keyframes badgePop {
+                    0%   { transform: scale(0.7) translateY(-4px); opacity: 0; }
+                    60%  { transform: scale(1.05) translateY(0); opacity: 1; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+                .badge-pop {
+                    animation: badgePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
             `}</style>
             <div className="max-w-3xl mx-auto space-y-4">
                 {/* Header */}
@@ -694,11 +703,16 @@ export default function SessionDetailPage() {
                         { label: 'Chờ chốt thanh toán', count: pendingReview.length, cls: 'bg-blue-50 text-blue-700 border border-blue-200' },
                         { label: 'Đã xác nhận thanh toán', count: confirmed.length, cls: 'bg-green-50 text-green-700 border border-green-200' },
                         { label: 'Thanh toán bị từ chối', count: rejected.length, cls: 'bg-red-50 text-red-600 border border-red-200' },
-                    ].map(({ label, count, cls }) => (
-                        <span key={label} className={`px-3 py-1 rounded-full text-sm font-medium ${cls}`}>
-                            {label}: {count}
-                        </span>
-                    ))}
+                    ]
+                        .filter(({ count }) => count > 0)
+                        .map(({ label, count, cls }) => (
+                            <span
+                                key={label}
+                                className={`badge-pop px-3 py-1 rounded-full text-sm font-medium ${cls}`}
+                            >
+                                {label}: {count}
+                            </span>
+                        ))}
                 </div>
 
                 <div className="card !p-0 overflow-hidden">
