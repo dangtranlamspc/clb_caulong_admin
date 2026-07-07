@@ -86,6 +86,7 @@ export const registrationsApi = {
   addGuest: (id: string, data: any) => api.post(`/registrations/${id}/guests`, data),
   checkinPresent: (id: string) => api.patch(`/registrations/${id}/checkin-present`),
   checkinAbsent: (id: string) => api.patch(`/registrations/${id}/checkin-absent`),
+  getAdminDetail: (id: string) => api.get(`/registrations/${id}/admin-detail`),
 };
 
 export const matchesApi = {
