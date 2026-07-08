@@ -67,6 +67,8 @@ export default function SessionDetailPage() {
     const [hostRegId, setHostRegId] = useState<string>('');
     const [guestPaidNow, setGuestPaidNow] = useState(false);
 
+    const [checkingInAll, setCheckingInAll] = useState(false);
+
     const fetchAll = async () => {
         setLoading(true);
         try {
@@ -78,6 +80,27 @@ export default function SessionDetailPage() {
             setRegs(r);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCheckinAllPresent = async () => {
+        if (awaitingCheckin.length === 0) return;
+        if (!confirm(`Điểm danh có mặt cho tất cả ${awaitingCheckin.length} người đang chờ điểm danh?`)) return;
+
+        setCheckingInAll(true);
+        try {
+            const results = await Promise.allSettled(
+                awaitingCheckin.map(r => registrationsApi.checkinPresent(r.id))
+            );
+            const succeeded = results.filter(r => r.status === 'fulfilled').length;
+            const failed = results.length - succeeded;
+
+            if (succeeded > 0) toast.success(`Đã điểm danh có mặt cho ${succeeded} người`);
+            if (failed > 0) toast.error(`${failed} người điểm danh thất bại`);
+
+            await refreshSilently();
+        } finally {
+            setCheckingInAll(false);
         }
     };
 
@@ -281,12 +304,10 @@ export default function SessionDetailPage() {
 
     if (!session) return null;
 
-
     const allPaid = registrations
         .filter(r => r.participation_status === 'confirmed')
         .every(r => r.payment_status === 'confirmed');
 
-    const canComplete = session.status === 'waiting_payment' && allPaid && registrations.filter(r => r.participation_status === 'confirmed').length > 0;
 
     const awaitingFinish = registrations.filter(r =>
         r.payment_status === 'pending' &&
@@ -314,6 +335,12 @@ export default function SessionDetailPage() {
     const rejected = registrations.filter(r => r.payment_status === 'rejected');
     const pendingApproval = registrations.filter(r => r.participation_status === 'pending_approval');
     const awaitingCheckin = registrations.filter(r => r.participation_status === 'awaiting_checkin');
+
+    const canComplete =
+        session.status === 'waiting_payment' &&
+        pendingReview.length === 0 &&
+        rejected.length === 0 &&
+        registrations.filter(r => r.participation_status === 'confirmed').length > 0;
 
     const hostRegs = registrations.filter(r => !r.host_registration_id);
     const guestsOf = (hostId: string) => registrations.filter(r => r.host_registration_id === hostId);
@@ -630,6 +657,18 @@ export default function SessionDetailPage() {
                             {awaitingCheckin.length > 0 && `${awaitingCheckin.length} người chưa điểm danh`}
                         </span>
                     )}
+
+                    {awaitingCheckin.length > 0 && (
+                        <button
+                            onClick={handleCheckinAllPresent}
+                            disabled={checkingInAll}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-50"
+                        >
+                            {checkingInAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                            <span className="hidden sm:inline">Điểm danh tất cả ({awaitingCheckin.length})</span>
+                            <span className="sm:hidden">Tất cả</span>
+                        </button>
+                    )}
                     {canAddMember && awaitingCheckin.length === 0 && pendingApproval.length === 0 && (
                         <Link
                             to={`/sessions/${id}/finish`}
@@ -642,9 +681,12 @@ export default function SessionDetailPage() {
                     {canComplete && (
                         <button
                             onClick={async () => {
-                                if (!confirm('Xác nhận hoàn thành buổi đánh? Buổi sẽ bị khoá lại.')) return;
+                                const msg = pending.length > 0
+                                    ? `Xác nhận hoàn thành buổi đánh? ${pending.length} người đang "Chờ thanh toán" sẽ được tự động chuyển sang "Đã xác nhận thanh toán" + "Tiền mặt". Buổi sẽ bị khoá lại.`
+                                    : 'Xác nhận hoàn thành buổi đánh? Buổi sẽ bị khoá lại.';
+                                if (!confirm(msg)) return;
                                 try {
-                                    await sessionsApi.updateStatus(id!, { status: 'completed' });
+                                    await sessionsApi.complete(id!);
                                     toast.success('Đã hoàn thành và khoá buổi đánh!');
                                     refreshSilently();
                                 } catch (err: any) {
