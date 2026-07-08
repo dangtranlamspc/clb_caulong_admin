@@ -124,6 +124,16 @@ function MemberPanel({ member, onClose, onChanged, onSelectTx }: {
         }
     };
 
+    const toggleSign = () => {
+        setAmountDisplay(prev => {
+            const trimmed = prev.trim();
+            if (trimmed.startsWith('-')) return trimmed.slice(1);
+            return trimmed ? `-${trimmed}` : '-';
+        });
+    };
+
+    const isNegativeAmount = amountDisplay.trim().startsWith('-');
+
     return (
         <div className="flex flex-col h-full bg-white lg:border-l border-gray-100">
             <div className="flex items-start justify-between p-4 sm:p-5 border-b border-gray-100">
@@ -179,14 +189,29 @@ function MemberPanel({ member, onClose, onChanged, onSelectTx }: {
                             {showTopup ? 'Nạp tiền thủ công' : 'Điều chỉnh số dư (có thể nhập số âm)'}
                         </p>
                         <div className="flex flex-col gap-2">
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={amountDisplay}
-                                onChange={handleAmountChange}
-                                placeholder="Số tiền"
-                                className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-shadow duration-150 bg-white"
-                            />
+                            <div className="flex gap-2">
+                                {showAdjust && (
+                                    <button
+                                        type="button"
+                                        onClick={toggleSign}
+                                        className={`flex-shrink-0 w-11 rounded-lg border text-base font-bold transition-colors ${isNegativeAmount
+                                            ? 'bg-red-50 border-red-300 text-red-600'
+                                            : 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                                            }`}
+                                        title={isNegativeAmount ? 'Đang trừ tiền — bấm để đổi thành cộng' : 'Đang cộng tiền — bấm để đổi thành trừ'}
+                                    >
+                                        {isNegativeAmount ? '−' : '+'}
+                                    </button>
+                                )}
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={amountDisplay}
+                                    onChange={handleAmountChange}
+                                    placeholder="Số tiền"
+                                    className="flex-1 min-w-0 px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-shadow duration-150 bg-white"
+                                />
+                            </div>
                             <input
                                 value={note}
                                 onChange={e => setNote(e.target.value)}
@@ -593,10 +618,10 @@ export default function WalletAdminSummaryPage() {
                             <div
                                 ref={panelRef}
                                 className={`fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] rounded-t-2xl overflow-hidden flex flex-col
-                       lg:static lg:z-auto lg:w-[420px] lg:flex-shrink-0 lg:rounded-xl lg:max-h-[calc(100dvh-200px)]
-                       bg-white shadow-sm border border-gray-100 transform-gpu overscroll-contain
-                       transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform
-                       ${panelOpen
+                                    lg:static lg:z-auto lg:w-[420px] lg:flex-shrink-0 lg:rounded-xl lg:max-h-[calc(100dvh-200px)]
+                                    bg-white shadow-sm border border-gray-100 transform-gpu overscroll-contain
+                                    transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform
+                                    ${panelOpen
                                         ? 'translate-y-0 opacity-100 lg:translate-x-0'
                                         : 'translate-y-full opacity-0 lg:translate-y-0 lg:translate-x-6'
                                     }`}
