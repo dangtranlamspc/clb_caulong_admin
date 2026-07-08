@@ -54,14 +54,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex items-center gap-3 px-5 py-5">
         <div className="w-20 h-20 flex items-center justify-center flex-shrink-0">
           <img
-            src="https://res.cloudinary.com/ds6mtnyyk/image/upload/v1783485560/icon_clb_dcoh2b.jpg"
+            src="https://res.cloudinary.com/ds6mtnyyk/image/upload/v1783494767/LOGO_TEAM_BNB_WHITE_hs59vg.png"
             alt="Logo CLB"
             className="w-full h-full object-contain"
           />
         </div>
         <div className="min-w-0">
-          <p className="text-white font-bold text-sm leading-tight tracking-tight">Admin Panel</p>
-          <p className="text-slate-500 text-[11px] font-medium">CLB Cầu Lông</p>
+          <p className="text-white font-bold text-sm leading-tight tracking-tight">QUẢN TRỊ</p>
+          <p className="text-slate-500 text-[11px] font-medium">BNB BADMINTON CLUB</p>
         </div>
       </div>
 
