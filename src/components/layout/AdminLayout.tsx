@@ -49,12 +49,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     children?.some(c => location.pathname === c.path || location.pathname.startsWith(c.path)) ?? false;
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
-    <div className={`flex flex-col h-full bg-[#0f1420] ${mobile ? '' : 'w-64'}`}>
+    <div className={`flex flex-col h-full bg-[#0f141f] ${mobile ? '' : 'w-64'}`}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5">
         <div className="w-20 h-20 flex items-center justify-center flex-shrink-0">
           <img
-            src="https://res.cloudinary.com/ds6mtnyyk/image/upload/v1782199056/icon_home-fn_z1thtm.png"
+            src="https://res.cloudinary.com/ds6mtnyyk/image/upload/v1783485560/icon_clb_dcoh2b.jpg"
             alt="Logo CLB"
             className="w-full h-full object-contain"
           />
