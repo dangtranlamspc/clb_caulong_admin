@@ -11,10 +11,6 @@ import { useAuthStore } from '../../stores/auth.store';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
-/* ------------------------------------------------------------------ */
-/* Kiểu dữ liệu tối giản cho các phần chưa có API riêng (xem ghi chú   */
-/* TODO bên dưới) — cứ thay bằng response thật khi backend có sẵn.     */
-/* ------------------------------------------------------------------ */
 type LeaderRow = {
   id: string;
   full_name: string;
@@ -98,12 +94,8 @@ export default function DashboardPage() {
 
   const [sessionCounts, setSessionCounts] = useState({ today: 0, this_week: 0, this_month: 0 });
   const [walletSummary, setWalletSummary] = useState<any>(null);
-  // Thu/chi thực tế của tháng, tính từ toàn bộ wallet_transactions của mọi user
   const [monthlyFinance, setMonthlyFinance] = useState({ income: 0, expense: 0 });
 
-  // Bảng xếp hạng: nạp từ rankingsApi.rankLeaderboard() thật, top 5.
-  // TODO: 2 danh sách dưới đây (thông báo, sự kiện) hiện chưa có API — thay bằng call thật
-  // (vd. notificationsApi.list(), eventsApi.upcoming()) khi backend bổ sung endpoint tương ứng.
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
 
   const [notifications] = useState<NotificationRow[]>([
@@ -121,7 +113,7 @@ export default function DashboardPage() {
 
   const [leaderTab, setLeaderTab] = useState<'points' | 'revice'>('points');
 
-  // Biểu đồ thu chi: kỳ hạn (số tháng lùi về) + năm mốc, nạp từ API thật
+
   const [financePeriod, setFinancePeriod] = useState(6);
   const [financeYear, setFinanceYear] = useState(new Date().getFullYear());
   const [financeYears, setFinanceYears] = useState<number[]>([new Date().getFullYear()]);
@@ -141,10 +133,7 @@ export default function DashboardPage() {
 
     Promise.allSettled([
       usersApi.dashboard(),
-      // Đếm nhanh theo member_subtype / member_type bằng meta.total của list()
-      usersApi.list({ role: 'member', member_subtype: 'vip', is_active: 'true', limit: 1, page: 1 }),
-      usersApi.list({ role: 'member', member_subtype: 'thuong', is_active: 'true', limit: 1, page: 1 }),
-      usersApi.list({ role: 'member', member_type: 'vang_lai', is_active: 'true', limit: 1, page: 1 }),
+      usersApi.memberTypeCounts(),
       sessionsApi.list({ from_date: iso(startOfDay), to_date: iso(startOfDay), limit: 1, page: 1 }),
       sessionsApi.list({ from_date: iso(startOfWeek), to_date: iso(endOfWeek), limit: 1, page: 1 }),
       sessionsApi.list({ from_date: iso(startOfMonth), to_date: iso(endOfMonth), limit: 1, page: 1 }),
@@ -153,20 +142,20 @@ export default function DashboardPage() {
       walletAdminApi.getMonthlyFinance(),
     ]).then((results) => {
       const [
-        dashboardRes, vipRes, thuongRes, vangLaiRes,
+        dashboardRes, countsRes,
         todayRes, weekRes, monthRes, walletRes, leaderboardRes, financeRes,
       ] = results;
 
       if (dashboardRes.status === 'fulfilled') setStats((dashboardRes.value as any).data);
       else console.error('usersApi.dashboard() failed:', (dashboardRes as any).reason);
 
-      const vipCount = vipRes.status === 'fulfilled' ? (vipRes.value as any)?.data?.meta?.total ?? 0 : 0;
-      const thuongCount = thuongRes.status === 'fulfilled' ? (thuongRes.value as any)?.data?.meta?.total ?? 0 : 0;
-      const vangLaiCount = vangLaiRes.status === 'fulfilled' ? (vangLaiRes.value as any)?.data?.meta?.total ?? 0 : 0;
-
-      setMemberBreakdown({ vip: vipCount, thuong: thuongCount, vang_lai: vangLaiCount });
-      // Tổng thành viên = VIP + Thường + Vãng lai (chỉ tính user đang active)
-      setTotalMembers(vipCount + thuongCount + vangLaiCount);
+      if (countsRes.status === 'fulfilled') {
+        const c = (countsRes.value as any).data;
+        setMemberBreakdown({ vip: c.vip ?? 0, thuong: c.thuong ?? 0, vang_lai: c.vang_lai ?? 0 });
+        setTotalMembers(c.total ?? 0);
+      } else {
+        console.error('memberTypeCounts() failed:', (countsRes as any).reason);
+      }
 
       setSessionCounts({
         today: todayRes.status === 'fulfilled' ? (todayRes.value as any)?.data?.meta?.total ?? 0 : 0,
@@ -181,8 +170,6 @@ export default function DashboardPage() {
         setLeaderboard(
           rows.slice(0, 5).map((r) => ({
             id: r.id,
-            // "rank_leaderboard" là 1 view Supabase — nếu view chưa join full_name,
-            // bổ sung cột này ở view hoặc thay bằng lookup riêng.
             full_name: r.full_name ?? 'Chưa rõ tên',
             rank_label: r.tier ?? '—',
             points: r.total_points ?? 0,

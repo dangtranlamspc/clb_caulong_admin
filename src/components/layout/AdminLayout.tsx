@@ -156,8 +156,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="px-3 pb-4 pt-3">
         <div className="mx-2 mb-3 border-t border-dashed border-slate-700/60" />
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.04]">
-          <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center flex-shrink-0 ring-2 ring-[#f4d35e]/70">
-            <User className="w-4 h-4 text-white" />
+          <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center flex-shrink-0 ring-2 ring-[#f4d35e]/70 overflow-hidden">
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.full_name}
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <User className="w-4 h-4 text-white" />
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-white text-sm font-medium truncate">{user?.full_name}</p>
@@ -219,8 +228,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Bell className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center overflow-hidden">
+              {user?.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.full_name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <User className="w-4 h-4 text-white" />
+              )}
             </div>
             <span className="text-sm font-medium text-gray-700 hidden sm:block">
               {user?.full_name}

@@ -209,6 +209,8 @@ export default function MembersPage() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Xuất Excel thành công!');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Xuất Excel thất bại');
     } finally {
       setExporting(false);
     }
@@ -220,6 +222,8 @@ export default function MembersPage() {
       const { data } = await usersApi.toggleActive(id);
       setUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: data.is_active } : u));
       toast.success(`Đã ${data.is_active ? 'kích hoạt' : 'vô hiệu hóa'} tài khoản`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Thao tác thất bại');
     } finally {
       setActionLoading(null);
     }
@@ -232,6 +236,8 @@ export default function MembersPage() {
       await usersApi.delete(id);
       toast.success('Đã xóa thành viên');
       fetchUsers();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Xóa thất bại');
     } finally {
       setActionLoading(null);
     }
