@@ -53,7 +53,7 @@ function PlayerNames({ p1, p2 }: { p1: any; p2?: any }) {
             {p2 && (
                 <>
                     <span className="text-gray-300">/</span>
-                    <PlayerAvatar p={p1} teamCls="bg-blue-100 text-blue-700" />
+                    <PlayerAvatar p={p2} teamCls="bg-blue-100 text-blue-700" />
                     <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">{p2?.full_name}</span>
                 </>
             )}
