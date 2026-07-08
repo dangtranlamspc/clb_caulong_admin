@@ -281,6 +281,10 @@ export default function SessionFinishPage() {
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
+            {/* Số tiền từng người */}
+>>>>>>> lam-dev
             <div className="card !p-0 overflow-hidden">
                 <div className="flex items-center justify-between px-4 pt-4 pb-3">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Số tiền từng người phải trả</p>
