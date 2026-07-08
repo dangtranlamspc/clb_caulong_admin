@@ -6,7 +6,8 @@ import {
     UserPlus, Search, Loader2, Eye, CornerDownRight,
     UserX,
     UserCheck,
-    Calculator
+    Calculator,
+    RotateCcw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -69,6 +70,8 @@ export default function SessionDetailPage() {
 
     const [checkingInAll, setCheckingInAll] = useState(false);
 
+    const [rollingBack, setRollingBack] = useState(false);
+
     const fetchAll = async () => {
         setLoading(true);
         try {
@@ -101,6 +104,35 @@ export default function SessionDetailPage() {
             await refreshSilently();
         } finally {
             setCheckingInAll(false);
+        }
+    };
+
+
+    const handleRollbackFinish = async () => {
+        const extraWarning = session.status === 'completed'
+            ? '\n\n⚠️ Buổi này đã ở trạng thái "Hoàn thành" — hoàn tác sẽ mở lại buổi để chỉnh sửa.'
+            : '';
+
+        if (!confirm(
+            'Hoàn tác hóa đơn đã gửi cho buổi này?\n\n' +
+            '• Tiền đã trừ ví sẽ được hoàn lại và ghi vào lịch sử ví.\n' +
+            '• Yêu cầu thanh toán member đã gửi (chưa được admin xác nhận) sẽ bị huỷ, member sẽ nhận thông báo.\n' +
+            '• Những người admin ĐÃ xác nhận thanh toán thủ công sẽ KHÔNG bị ảnh hưởng.' +
+            extraWarning
+        )) return;
+
+        setRollingBack(true);
+        try {
+            const { data } = await sessionsApi.rollbackFinish(id!);
+            toast.success(data.message);
+            if (data.skipped_manually_confirmed_count > 0) {
+                toast(`Lưu ý: ${data.skipped_manually_confirmed_count} người đã được admin xác nhận thanh toán thủ công trước đó, không bị ảnh hưởng.`, { icon: 'ℹ️', duration: 6000 });
+            }
+            refreshSilently();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message ?? 'Hoàn tác thất bại');
+        } finally {
+            setRollingBack(false);
         }
     };
 
@@ -669,6 +701,7 @@ export default function SessionDetailPage() {
                             <span className="sm:hidden">Tất cả</span>
                         </button>
                     )}
+
                     {canAddMember && awaitingCheckin.length === 0 && pendingApproval.length === 0 && (
                         <Link
                             to={`/sessions/${id}/finish`}
@@ -676,6 +709,18 @@ export default function SessionDetailPage() {
                         >
                             <Calculator className="w-4 h-4" /> Kết thúc
                         </Link>
+                    )}
+
+                    {(session.status === 'waiting_payment' || session.status === 'completed') && (
+                        <button
+                            onClick={handleRollbackFinish}
+                            disabled={rollingBack}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-50"
+                        >
+                            {rollingBack ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                            <span className="hidden sm:inline">Hoàn tác hóa đơn</span>
+                            <span className="sm:hidden">Hoàn tác</span>
+                        </button>
                     )}
 
                     {canComplete && (

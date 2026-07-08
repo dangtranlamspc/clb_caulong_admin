@@ -75,6 +75,7 @@ export const sessionsApi = {
   getCost: (id: string) => api.get(`/sessions/${id}/cost`),
   finish: (id: string, data: any) => api.patch(`/sessions/${id}/finish`, data),
   complete: (id: string) => api.patch(`/sessions/${id}/complete`),
+  rollbackFinish: (id: string) => api.patch(`/sessions/${id}/rollback-finish`),
 };
 
 export const registrationsApi = {
