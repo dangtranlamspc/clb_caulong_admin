@@ -4,6 +4,8 @@ import {
     ChevronLeft, ChevronRight, RefreshCw,
     Swords, Users, Trophy, EyeOff, Eye,
     Plus,
+    Trash2,
+    Undo2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -74,6 +76,8 @@ export default function MatchesAdminPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showScoreInput, setShowScoreInput] = useState<string | null>(null);
     const [scoreInputs, setScoreInputs] = useState<Record<string, { score_a: string; score_b: string }>>({});
+    const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [rollbackId, setRollbackId] = useState<string | null>(null);
 
     const fetchMatches = useCallback(async () => {
         setLoading(true);
@@ -182,6 +186,34 @@ export default function MatchesAdminPage() {
         } catch {
             setHiddenMap(prev => ({ ...prev, [id]: !nextHidden }));
             toast.error('Thao tác thất bại');
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        setActionId(id);
+        try {
+            await matchesApi.delete(id);
+            toast.success('🗑️ Đã xóa vĩnh viễn trận đấu');
+            setDeleteId(null);
+            fetchMatches();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message ?? 'Xóa thất bại');
+        } finally {
+            setActionId(null);
+        }
+    };
+
+    const handleRollback = async (id: string) => {
+        setActionId(id);
+        try {
+            const { data } = await matchesApi.rollback(id);
+            toast.success(data.message ?? '↩️ Đã thu hồi kết quả trận đấu');
+            setRollbackId(null);
+            fetchMatches();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message ?? 'Thu hồi thất bại');
+        } finally {
+            setActionId(null);
         }
     };
 
@@ -379,8 +411,74 @@ export default function MatchesAdminPage() {
                                                 : <><EyeOff className="w-3 h-3" /> Ẩn</>
                                             }
                                         </button>
+
+                                        {/* Confirm xóa */}
+                                        {deleteId === m.id && (
+                                            <div className="flex items-center gap-2 pt-1 bg-red-50 border border-red-100 rounded-lg p-2.5">
+                                                <p className="text-xs text-red-600 flex-1">
+                                                    Xóa vĩnh viễn trận này? Hành động không thể hoàn tác.
+                                                </p>
+                                                <button
+                                                    onClick={() => handleDelete(m.id)}
+                                                    disabled={actionId === m.id}
+                                                    className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                                >
+                                                    Xác nhận xóa
+                                                </button>
+                                                <button
+                                                    onClick={() => setDeleteId(null)}
+                                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg"
+                                                >
+                                                    Hủy
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Confirm thu hồi */}
+                                        {rollbackId === m.id && (
+                                            <div className="flex items-center gap-2 pt-1 bg-orange-50 border border-orange-100 rounded-lg p-2.5">
+                                                <p className="text-xs text-orange-700 flex-1">
+                                                    Thu hồi kết quả? Tỉ số sẽ bị xóa, trận về "Chờ kết quả", và điểm rank + bao điểm đã cộng/trừ cho các người chơi sẽ bị thu hồi. Member sẽ nhận thông báo.
+                                                </p>
+                                                <button
+                                                    onClick={() => handleRollback(m.id)}
+                                                    disabled={actionId === m.id}
+                                                    className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                                >
+                                                    Xác nhận thu hồi
+                                                </button>
+                                                <button
+                                                    onClick={() => setRollbackId(null)}
+                                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg"
+                                                >
+                                                    Hủy
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
+
+                                {m.status !== 'approved' && (
+                                    <button
+                                        onClick={() => setDeleteId(m.id)}
+                                        disabled={actionId === m.id}
+                                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
+                                        title="Xóa vĩnh viễn trận đấu"
+                                    >
+                                        <Trash2 className="w-3 h-3" /> Xóa
+                                    </button>
+                                )}
+
+                                {m.status === 'approved' && (
+                                    <button
+                                        onClick={() => setRollbackId(m.id)}
+                                        disabled={actionId === m.id}
+                                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors disabled:opacity-50"
+                                        title="Thu hồi kết quả, hủy tỉ số và thu hồi điểm"
+                                    >
+                                        <Undo2 className="w-3 h-3" /> Thu hồi
+                                    </button>
+                                )}
 
                                 {/* ── Input nhập tỉ số khi duyệt thẳng từ pending_result ── */}
                                 {showScoreInput === m.id && (

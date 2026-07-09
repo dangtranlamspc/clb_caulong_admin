@@ -107,6 +107,8 @@ export const matchesApi = {
     api.patch(`/matches/${id}/approve`, data ?? {}),
   reject: (id: string, reason: string) => api.patch(`/matches/${id}/reject`, { reject_reason: reason }),
   adminCreate: (data: any) => api.post('/matches/admin-create', data),
+  delete: (id: string) => api.delete(`/matches/${id}`),
+  rollback: (id: string) => api.patch(`/matches/${id}/rollback`),
 };
 
 export const rankingsApi = {
