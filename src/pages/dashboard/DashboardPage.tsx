@@ -18,6 +18,7 @@ type LeaderRow = {
   avatar_url?: string | null;
   rank_label: string;
   points: number;
+  points_delta: number;
   badge: 'fire' | 'verified' | null;
 };
 
@@ -27,6 +28,7 @@ type AttendanceLeaderRow = {
   avatar_url?: string | null;
   sessions_this_month: number;
   total_sessions: number;
+  sessions_delta: number;
 };
 
 type NotificationRow = {
@@ -91,7 +93,25 @@ function rankBadgeClass(idx: number) {
   return 'text-gray-400';
 }
 
-// Avatar dùng chung cho bảng xếp hạng — fallback icon khi không có avatar_url
+function MiniDelta({ delta }: { delta: number }) {
+  if (delta > 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
+        ▲ {delta}
+      </span>
+    );
+  }
+  if (delta < 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-500">
+        ▼ {Math.abs(delta)}
+      </span>
+    );
+  }
+  return <span className="text-[10px] font-medium text-gray-300">—</span>;
+}
+
+
 function LeaderAvatar({ src, name }: { src?: string | null; name: string }) {
   const [err, setErr] = useState(false);
   const show = src && !err;
@@ -236,6 +256,7 @@ export default function DashboardPage() {
             avatar_url: r.avatar_url ?? null,
             rank_label: r.tier ?? '—',
             points: r.total_points ?? 0,
+            points_delta: r.points_this_week ?? 0,
             badge: null,
           })),
         );
@@ -253,6 +274,7 @@ export default function DashboardPage() {
               avatar_url: r.avatar_url ?? null,
               sessions_this_month: r.sessions_this_month ?? 0,
               total_sessions: r.total_sessions ?? 0,
+              sessions_delta: r.sessions_delta ?? 0,
             })),
         );
       } else {
@@ -531,9 +553,12 @@ export default function DashboardPage() {
                     </p>
                     <p className="text-[11px] text-gray-400">Rank: {p.rank_label}</p>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-bold text-gray-800">{p.points.toLocaleString('vi-VN')}</p>
-                    <p className="text-[10px] text-gray-400">điểm</p>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-800">{p.points.toLocaleString('vi-VN')}</p>
+                      <p className="text-[10px] text-gray-400">điểm</p>
+                    </div>
+                    <MiniDelta delta={p.points_delta} />
                   </div>
                 </div>
               ))
@@ -555,9 +580,12 @@ export default function DashboardPage() {
                         <span className="truncate">{tier.label}</span>
                       </p>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-gray-800">{p.sessions_this_month}</p>
-                      <p className="text-[10px] text-gray-400">buổi</p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-800">{p.sessions_this_month}</p>
+                        <p className="text-[10px] text-gray-400">buổi</p>
+                      </div>
+                      <MiniDelta delta={p.sessions_delta} />
                     </div>
                   </div>
                 );
