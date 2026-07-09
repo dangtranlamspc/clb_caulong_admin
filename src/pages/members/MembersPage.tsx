@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, Plus, Download, Filter, ChevronLeft, ChevronRight,
   Trash2, ToggleLeft, ToggleRight, Eye
@@ -206,15 +206,21 @@ function RowActions({
 }
 
 export default function MembersPage() {
+  const [searchParams] = useSearchParams();
+
+  const initialMemberType = searchParams.get('member_type') ?? '';
+  const initialMemberSubtype = searchParams.get('member_subtype') ?? '';
   const [users, setUsers] = useState<any[]>([]);
   const [meta, setMeta] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState({
     search: '', role: '', gender: '', shirt_size: '', is_active: '',
-    member_type: '', member_subtype: '', level: '',
+    member_type: initialMemberType,
+    member_subtype: initialMemberSubtype,
+    level: '',
     page: 1, limit: 20,
   });
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(!!initialMemberType);
   const [exporting, setExporting] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -350,14 +356,12 @@ export default function MembersPage() {
               onChange={v => setQuery(q => ({
                 ...q,
                 member_type: v,
-                // reset loại (thường/vip) khi đổi phân cấp, tránh lọc sai
                 member_subtype: v === 'co_dinh' ? q.member_subtype : '',
                 page: 1,
               }))}
               options={MEMBER_TYPE_OPTIONS}
             />
 
-            {/* Chỉ hiện khi phân cấp = Thành viên, để lọc Thường / VIP */}
             {query.member_type === 'co_dinh' && (
               <CustomSelect
                 value={query.member_subtype}

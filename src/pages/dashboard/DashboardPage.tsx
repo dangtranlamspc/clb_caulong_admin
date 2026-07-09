@@ -10,6 +10,7 @@ import { usersApi, sessionsApi, walletAdminApi, rankingsApi } from '../../api';
 import { useAuthStore } from '../../stores/auth.store';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { Link } from 'react-router-dom';
 
 type LeaderRow = {
   id: string;
@@ -105,11 +106,14 @@ function LeaderAvatar({ src, name }: { src?: string | null; name: string }) {
   );
 }
 
-function StatCard({ icon: Icon, iconBg, label, value, deltaLabel }: {
-  icon: any; iconBg: string; label: string; value: number | string; deltaLabel?: string;
+function StatCard({ icon: Icon, iconBg, label, value, deltaLabel, to }: {
+  icon: any; iconBg: string; label: string; value: number | string; deltaLabel?: string; to?: string;
 }) {
-  return (
-    <div className="card flex items-start gap-4">
+  const content = (
+    <div
+      className={`card flex items-start gap-4 h-full transition-all duration-200 ${to ? 'cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-blue-200 active:translate-y-0 active:shadow-md' : ''
+        }`}
+    >
       <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${iconBg}`}>
         <Icon className="w-5 h-5 text-white" />
       </div>
@@ -126,6 +130,15 @@ function StatCard({ icon: Icon, iconBg, label, value, deltaLabel }: {
       </div>
     </div>
   );
+
+  if (to) {
+    return (
+      <Link to={to} className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300">
+        {content}
+      </Link>
+    );
+  }
+  return content;
 }
 
 export default function DashboardPage() {
@@ -253,7 +266,6 @@ export default function DashboardPage() {
     }).finally(() => setLoading(false));
   }, []);
 
-  // Danh sách năm có dữ liệu — nạp 1 lần
   useEffect(() => {
     walletAdminApi.getFinanceYears()
       .then(({ data }) => {
@@ -262,7 +274,6 @@ export default function DashboardPage() {
       .catch(() => { });
   }, []);
 
-  // Lịch sử thu/chi theo tháng — nạp lại mỗi khi đổi kỳ hạn hoặc năm
   useEffect(() => {
     setFinanceChartLoading(true);
     walletAdminApi.getFinanceHistory({ months: financePeriod, year: financeYear })
@@ -318,25 +329,28 @@ export default function DashboardPage() {
           label="Tổng thành viên"
           value={totalMembers}
           deltaLabel={stats?.new_members_this_month ? `${stats.new_members_this_month} thành viên mới` : undefined}
+          to="/members"
         />
         <StatCard
           icon={Crown}
           iconBg="bg-emerald-500"
           label="Thành viên VIP"
           value={memberBreakdown.vip}
-          deltaLabel={undefined}
+          to="/members?member_type=co_dinh&member_subtype=vip"
         />
         <StatCard
           icon={User}
           iconBg="bg-violet-400"
           label="Thành viên thường"
           value={memberBreakdown.thuong}
+          to="/members?member_type=co_dinh&member_subtype=thuong"
         />
         <StatCard
           icon={UserRound}
           iconBg="bg-orange-400"
           label="Thành viên vãng lai"
           value={memberBreakdown.vang_lai}
+          to="/members?member_type=vang_lai"
         />
       </div>
 
