@@ -7,8 +7,9 @@ import {
 import toast from 'react-hot-toast';
 import { usersApi } from '../../api';
 import { format } from 'date-fns';
+import { CustomSelect } from '../../components/customs/CustomSelect';
 
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'].map(s => ({ value: s, label: s }));
 
 const LEVEL_LABEL: Record<string, string> = {
   yeu: 'Yếu',
@@ -19,6 +20,36 @@ const LEVEL_LABEL: Record<string, string> = {
   chuyen_nghiep: 'Chuyên nghiệp',
 };
 
+const ROLE_OPTIONS = [
+  { value: '', label: 'Tất cả vai trò' },
+  { value: 'member', label: 'Thành viên' },
+  { value: 'admin', label: 'Admin' },
+];
+
+const GENDER_OPTIONS = [
+  { value: '', label: 'Tất cả giới tính' },
+  { value: 'male', label: 'Nam' },
+  { value: 'female', label: 'Nữ' },
+  { value: 'other', label: 'Khác' },
+];
+
+const SHIRT_SIZE_OPTIONS = [
+  { value: '', label: 'Tất cả size' },
+  ...SIZE_OPTIONS,
+];
+
+const MEMBER_TYPE_OPTIONS = [
+  { value: '', label: 'Tất cả phân cấp' },
+  { value: 'vang_lai', label: 'Vãng lai' },
+  { value: 'co_dinh', label: 'Thành viên' },
+];
+
+const MEMBER_SUBTYPE_OPTIONS = [
+  { value: '', label: 'Tất cả loại' },
+  { value: 'thuong', label: 'Thường' },
+  { value: 'vip', label: 'VIP' },
+];
+
 const LEVEL_OPTIONS = [
   { value: '', label: 'Tất cả trình độ' },
   { value: 'yeu', label: 'Yếu' },
@@ -27,6 +58,12 @@ const LEVEL_OPTIONS = [
   { value: 'tb_plus', label: 'TB+' },
   { value: 'ban_chuyen', label: 'Bán chuyên (BC)' },
   { value: 'chuyen_nghiep', label: 'Chuyên nghiệp' },
+];
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'true', label: 'Đang hoạt động' },
+  { value: 'false', label: 'Vô hiệu hóa' },
 ];
 
 function Avatar({ user, sizeClass = 'w-10 h-10 text-sm' }: { user: any; sizeClass?: string }) {
@@ -173,7 +210,8 @@ export default function MembersPage() {
   const [meta, setMeta] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState({
-    search: '', role: '', gender: '', shirt_size: '', is_active: '', member_type: '', level: '',
+    search: '', role: '', gender: '', shirt_size: '', is_active: '',
+    member_type: '', member_subtype: '', level: '',
     page: 1, limit: 20,
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -291,61 +329,54 @@ export default function MembersPage() {
 
         {showFilters && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-gray-100">
-            <select
+            <CustomSelect
               value={query.role}
-              onChange={e => setQuery(q => ({ ...q, role: e.target.value, page: 1 }))}
-              className="input-field text-sm"
-            >
-              <option value="">Tất cả vai trò</option>
-              <option value="member">Thành viên</option>
-              <option value="admin">Admin</option>
-            </select>
-            <select
+              onChange={v => setQuery(q => ({ ...q, role: v, page: 1 }))}
+              options={ROLE_OPTIONS}
+            />
+            <CustomSelect
               value={query.gender}
-              onChange={e => setQuery(q => ({ ...q, gender: e.target.value, page: 1 }))}
-              className="input-field text-sm"
-            >
-              <option value="">Tất cả giới tính</option>
-              <option value="male">Nam</option>
-              <option value="female">Nữ</option>
-              <option value="other">Khác</option>
-            </select>
-            <select
+              onChange={v => setQuery(q => ({ ...q, gender: v, page: 1 }))}
+              options={GENDER_OPTIONS}
+            />
+            <CustomSelect
               value={query.shirt_size}
-              onChange={e => setQuery(q => ({ ...q, shirt_size: e.target.value, page: 1 }))}
-              className="input-field text-sm"
-            >
-              <option value="">Tất cả size</option>
-              {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+              onChange={v => setQuery(q => ({ ...q, shirt_size: v, page: 1 }))}
+              options={SHIRT_SIZE_OPTIONS}
+            />
 
-            <select
+            <CustomSelect
               value={query.member_type}
-              onChange={e => setQuery(q => ({ ...q, member_type: e.target.value, page: 1 }))}
-              className="input-field text-sm"
-            >
-              <option value="">Tất cả phân cấp</option>
-              <option value="vang_lai">Vãng lai</option>
-              <option value="co_dinh">Thành viên</option>
-            </select>
+              onChange={v => setQuery(q => ({
+                ...q,
+                member_type: v,
+                // reset loại (thường/vip) khi đổi phân cấp, tránh lọc sai
+                member_subtype: v === 'co_dinh' ? q.member_subtype : '',
+                page: 1,
+              }))}
+              options={MEMBER_TYPE_OPTIONS}
+            />
 
-            <select
+            {/* Chỉ hiện khi phân cấp = Thành viên, để lọc Thường / VIP */}
+            {query.member_type === 'co_dinh' && (
+              <CustomSelect
+                value={query.member_subtype}
+                onChange={v => setQuery(q => ({ ...q, member_subtype: v, page: 1 }))}
+                options={MEMBER_SUBTYPE_OPTIONS}
+              />
+            )}
+
+            <CustomSelect
               value={query.level}
-              onChange={e => setQuery(q => ({ ...q, level: e.target.value, page: 1 }))}
-              className="input-field text-sm"
-            >
-              {LEVEL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+              onChange={v => setQuery(q => ({ ...q, level: v, page: 1 }))}
+              options={LEVEL_OPTIONS}
+            />
 
-            <select
+            <CustomSelect
               value={query.is_active}
-              onChange={e => setQuery(q => ({ ...q, is_active: e.target.value, page: 1 }))}
-              className="input-field text-sm"
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="true">Đang hoạt động</option>
-              <option value="false">Vô hiệu hóa</option>
-            </select>
+              onChange={v => setQuery(q => ({ ...q, is_active: v, page: 1 }))}
+              options={STATUS_OPTIONS}
+            />
           </div>
         )}
       </div>

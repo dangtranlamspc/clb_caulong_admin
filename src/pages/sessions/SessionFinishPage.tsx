@@ -338,7 +338,6 @@ export default function SessionFinishPage() {
                                     )}
                                 </div>
 
-                                {/* Chọn chế độ ví — full width, tách riêng khỏi hàng trên để không bị ép trên mobile */}
                                 {guests.length > 0 && isWalletDeduct && (
                                     <div className="pt-1">
                                         <p className="text-[11px] font-medium text-gray-400 mb-1.5">

@@ -152,7 +152,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         })}
       </nav>
 
-      {/* User info */}
       <div className="px-3 pb-4 pt-3">
         <div className="mx-2 mb-3 border-t border-dashed border-slate-700/60" />
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.04]">
@@ -186,12 +185,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Desktop sidebar */}
       <div className="hidden lg:flex flex-col w-64 flex-shrink-0">
         <Sidebar />
       </div>
 
-      {/* Mobile sidebar overlay - luôn render, dùng transition để trượt vào/ra */}
       <div
         className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ease-out ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}

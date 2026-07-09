@@ -7,7 +7,8 @@ import {
     UserX,
     UserCheck,
     Calculator,
-    RotateCcw
+    RotateCcw,
+    Wallet
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -17,6 +18,7 @@ import SessionCostCard from './SessionCostCard';
 import { MorphButton } from '../../components/MorphButton';
 import { supabase } from '../../lib/supabase';
 import { createPortal } from 'react-dom';
+import { CustomSelect } from '../../components/customs/CustomSelect';
 
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> = {
@@ -72,6 +74,13 @@ export default function SessionDetailPage() {
 
     const [rollingBack, setRollingBack] = useState(false);
 
+
+    const [showRollbackModal, setShowRollbackModal] = useState(false);
+    const [rollbackModalVisible, setRollbackModalVisible] = useState(false);
+
+
+    const [addModalVisible, setAddModalVisible] = useState(false);
+
     const fetchAll = async () => {
         setLoading(true);
         try {
@@ -109,24 +118,18 @@ export default function SessionDetailPage() {
 
 
     const handleRollbackFinish = async () => {
-        const extraWarning = session.status === 'completed'
-            ? '\n\n⚠️ Buổi này đã ở trạng thái "Hoàn thành" — hoàn tác sẽ mở lại buổi để chỉnh sửa.'
-            : '';
-
-        if (!confirm(
-            'Hoàn tác hóa đơn đã gửi cho buổi này?\n\n' +
-            '• Tiền đã trừ ví sẽ được hoàn lại và ghi vào lịch sử ví.\n' +
-            '• Yêu cầu thanh toán member đã gửi (chưa được admin xác nhận) sẽ bị huỷ, member sẽ nhận thông báo.\n' +
-            '• Những người admin ĐÃ xác nhận thanh toán thủ công sẽ KHÔNG bị ảnh hưởng.' +
-            extraWarning
-        )) return;
-
+        setShowRollbackModal(false);
         setRollingBack(true);
         try {
             const { data } = await sessionsApi.rollbackFinish(id!);
-            toast.success(data.message);
-            if (data.skipped_manually_confirmed_count > 0) {
-                toast(`Lưu ý: ${data.skipped_manually_confirmed_count} người đã được admin xác nhận thanh toán thủ công trước đó, không bị ảnh hưởng.`, { icon: 'ℹ️', duration: 6000 });
+            if (data.errors?.length > 0) {
+                toast.error(`Hoàn tác xong nhưng có ${data.errors.length} lỗi — vui lòng kiểm tra lại thủ công.`, { duration: 8000 });
+                console.error('[rollbackFinish errors]', data.errors);
+            } else {
+                toast.success(data.message);
+            }
+            if (data.cancelled_confirmed_manual_count > 0) {
+                toast(`${data.cancelled_confirmed_manual_count} khoản đã xác nhận thủ công (tiền mặt/CK) cũng đã bị huỷ theo yêu cầu.`, { icon: 'ℹ️', duration: 6000 });
             }
             refreshSilently();
         } catch (err: any) {
@@ -173,6 +176,25 @@ export default function SessionDetailPage() {
         }, 300);
         return () => clearTimeout(t);
     }, [search, showAddModal, addTab]);
+
+    useEffect(() => {
+        if (showRollbackModal) {
+            const raf = requestAnimationFrame(() => setRollbackModalVisible(true));
+            return () => cancelAnimationFrame(raf);
+        }
+    }, [showRollbackModal]);
+
+    useEffect(() => {
+        if (showAddModal) {
+            const raf = requestAnimationFrame(() => setAddModalVisible(true));
+            return () => cancelAnimationFrame(raf);
+        }
+    }, [showAddModal]);
+
+    const closeRollbackModal = () => {
+        setRollbackModalVisible(false);
+        setTimeout(() => setShowRollbackModal(false), 200);
+    };
 
     const handleApproveRegistration = (regId: string) =>
         runAction(
@@ -268,16 +290,19 @@ export default function SessionDetailPage() {
     };
 
     const closeAddModal = () => {
-        setShowAddModal(false);
-        setSearch('');
-        setSearchResults([]);
-        setSelectedMembers([]);
-        setAddConfirmNow(false);
-        setAddNotes('');
-        setAddTab('account');
-        setGuestForm({ full_name: '', gender: 'male', skill_level: '' });
-        setHostRegId('');
-        setGuestPaidNow(false);
+        setAddModalVisible(false);
+        setTimeout(() => {
+            setShowAddModal(false);
+            setSearch('');
+            setSearchResults([]);
+            setSelectedMembers([]);
+            setAddConfirmNow(false);
+            setAddNotes('');
+            setAddTab('account');
+            setGuestForm({ full_name: '', gender: 'male', skill_level: '' });
+            setHostRegId('');
+            setGuestPaidNow(false);
+        }, 200);
     };
 
     const handleAddMember = async () => {
@@ -713,7 +738,7 @@ export default function SessionDetailPage() {
 
                     {(session.status === 'waiting_payment' || session.status === 'completed') && (
                         <button
-                            onClick={handleRollbackFinish}
+                            onClick={() => setShowRollbackModal(true)}
                             disabled={rollingBack}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-50"
                         >
@@ -858,13 +883,25 @@ export default function SessionDetailPage() {
                 )}
 
                 {/* ── Add member modal ── */}
+                {/* ── Add member modal ── */}
                 {showAddModal && typeof document !== 'undefined' && createPortal(
                     <div
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                        style={{
+                            background: 'rgba(0,0,0,0.4)',
+                            backdropFilter: 'blur(2px)',
+                            opacity: addModalVisible ? 1 : 0,
+                            transition: 'opacity 200ms ease-out',
+                        }}
                         onClick={closeAddModal}
                     >
                         <div
                             className="bg-white rounded-2xl w-full max-w-md shadow-xl"
+                            style={{
+                                transform: addModalVisible ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(8px)',
+                                opacity: addModalVisible ? 1 : 0,
+                                transition: 'transform 220ms cubic-bezier(0.32,0.72,0,1), opacity 200ms ease-out',
+                            }}
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -992,46 +1029,44 @@ export default function SessionDetailPage() {
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
-                                                <select
+                                                <CustomSelect
                                                     value={guestForm.gender}
-                                                    onChange={e => setGuestForm(f => ({ ...f, gender: e.target.value }))}
-                                                    className="input-field"
-                                                >
-                                                    <option value="male">Nam</option>
-                                                    <option value="female">Nữ</option>
-                                                </select>
+                                                    onChange={val => setGuestForm(f => ({ ...f, gender: val }))}
+                                                    options={[
+                                                        { value: 'male', label: 'Nam' },
+                                                        { value: 'female', label: 'Nữ' },
+                                                    ]}
+                                                />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Trình độ</label>
-                                                <select
+                                                <CustomSelect
                                                     value={guestForm.skill_level}
-                                                    onChange={e => setGuestForm(f => ({ ...f, skill_level: e.target.value }))}
-                                                    className="input-field"
-                                                >
-                                                    <option value="">-- Chọn --</option>
-                                                    <option value="yeu">Yếu</option>
-                                                    <option value="trung_binh_yeu">TB Yếu</option>
-                                                    <option value="trung_binh">Trung bình</option>
-                                                    <option value="trung_binh_cong">TB+</option>
-                                                    <option value="ban_chuyen">Bán chuyên</option>
-                                                    <option value="chuyen_nghiep">Chuyên nghiệp</option>
-                                                </select>
+                                                    onChange={val => setGuestForm(f => ({ ...f, skill_level: val }))}
+                                                    placeholder="-- Chọn --"
+                                                    options={[
+                                                        { value: 'yeu', label: 'Yếu' },
+                                                        { value: 'trung_binh_yeu', label: 'TB Yếu' },
+                                                        { value: 'trung_binh', label: 'Trung bình' },
+                                                        { value: 'trung_binh_cong', label: 'TB+' },
+                                                        { value: 'ban_chuyen', label: 'Bán chuyên' },
+                                                        { value: 'chuyen_nghiep', label: 'Chuyên nghiệp' },
+                                                    ]}
+                                                />
                                             </div>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                                 Đi cùng (tuỳ chọn, để gộp tiền)
                                             </label>
-                                            <select
+                                            <CustomSelect
                                                 value={hostRegId}
-                                                onChange={e => setHostRegId(e.target.value)}
-                                                className="input-field"
-                                            >
-                                                <option value="">-- Không, tính tiền riêng --</option>
-                                                {registrations.filter(r => !r.is_guest).map((r: any) => (
-                                                    <option key={r.id} value={r.id}>{r.users?.full_name}</option>
-                                                ))}
-                                            </select>
+                                                onChange={setHostRegId}
+                                                placeholder="-- Không, tính tiền riêng --"
+                                                options={registrations
+                                                    .filter(r => !r.is_guest)
+                                                    .map((r: any) => ({ value: r.id, label: r.users?.full_name ?? '?' }))}
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tuỳ chọn)</label>
@@ -1062,8 +1097,82 @@ export default function SessionDetailPage() {
                         </div>
                     </div>,
                     document.body
-                )
-                }
+                )}
+
+                {showRollbackModal && typeof document !== 'undefined' && createPortal(
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                        style={{
+                            background: 'rgba(0,0,0,0.4)',
+                            backdropFilter: 'blur(2px)',
+                            opacity: rollbackModalVisible ? 1 : 0,
+                            transition: 'opacity 200ms ease-out',
+                        }}
+                        onClick={closeRollbackModal}
+                    >
+                        <div
+                            className="bg-white rounded-2xl w-full max-w-md shadow-xl"
+                            style={{
+                                transform: rollbackModalVisible ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(8px)',
+                                opacity: rollbackModalVisible ? 1 : 0,
+                                transition: 'transform 220ms cubic-bezier(0.32,0.72,0,1), opacity 200ms ease-out',
+                            }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center flex-shrink-0">
+                                        <RotateCcw className="w-4 h-4 text-orange-500" />
+                                    </div>
+                                    <h3 className="font-bold text-gray-900">Hoàn tác hóa đơn?</h3>
+                                </div>
+                                <button onClick={closeRollbackModal} className="p-1 text-gray-400 hover:text-gray-600">
+                                    <XCircle className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-5 space-y-3">
+                                <p className="text-sm text-gray-500">
+                                    Hoàn tác hóa đơn đã gửi cho buổi <strong className="text-gray-700">{session.title}</strong>?
+                                </p>
+                                <ul className="space-y-2">
+                                    <li className="flex items-start gap-2 text-sm text-gray-600">
+                                        <Wallet className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                                        <span>Tiền đã trừ ví sẽ được <strong>hoàn lại</strong> và ghi vào lịch sử ví.</span>
+                                    </li>
+                                    <li className="flex items-start gap-2 text-sm text-gray-600">
+                                        <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                                        <span>
+                                            <strong>Tất cả</strong> xác nhận thanh toán (kể cả tiền mặt/chuyển khoản admin đã xác nhận thủ công) sẽ bị huỷ, member sẽ nhận thông báo.
+                                        </span>
+                                    </li>
+                                    <li className="flex items-start gap-2 text-sm text-gray-600">
+                                        <Calculator className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                        <span>Buổi sẽ mở lại để bạn chỉnh sửa chi phí và gửi hóa đơn mới.</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100">
+                                <button onClick={closeRollbackModal} className="btn-secondary text-sm">
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        closeRollbackModal();
+                                        handleRollbackFinish();
+                                    }}
+                                    disabled={rollingBack}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                                >
+                                    {rollingBack && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Xác nhận hoàn tác
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
             </div >
         </>
     );

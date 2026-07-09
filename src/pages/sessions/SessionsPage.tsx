@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { sessionsApi } from '../../api';
+import { createPortal } from 'react-dom';
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
     open: { label: 'Mở đăng ký', cls: 'bg-green-100 text-green-700' },
@@ -41,6 +42,9 @@ export default function SessionsPage() {
     const [query, setQuery] = useState({ status: '', page: 1, limit: 15 });
     const [actionId, setActionId] = useState<string | null>(null);
 
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+
     const fetch = useCallback(async () => {
         setLoading(true);
         try {
@@ -60,6 +64,18 @@ export default function SessionsPage() {
 
     useEffect(() => { fetch(); }, [fetch]);
 
+    useEffect(() => {
+        if (deleteTarget) {
+            const raf = requestAnimationFrame(() => setDeleteModalVisible(true));
+            return () => cancelAnimationFrame(raf);
+        }
+    }, [deleteTarget]);
+
+    const closeDeleteModal = () => {
+        setDeleteModalVisible(false);
+        setTimeout(() => setDeleteTarget(null), 200);
+    };
+
     const handleStatusChange = async (id: string, next: string) => {
         setActionId(id);
         try {
@@ -72,7 +88,13 @@ export default function SessionsPage() {
     };
 
     const handleDelete = async (id: string, title: string) => {
-        if (!confirm(`Xóa buổi "${title}"? Hành động này không thể hoàn tác.`)) return;
+        setDeleteTarget({ id, title });
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        const { id } = deleteTarget;
+        closeDeleteModal();
         setActionId(id);
         try {
             await sessionsApi.delete(id);
@@ -260,6 +282,62 @@ export default function SessionsPage() {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* ── Delete confirm modal ── */}
+            {deleteTarget && typeof document !== 'undefined' && createPortal(
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    style={{
+                        background: 'rgba(0,0,0,0.4)',
+                        backdropFilter: 'blur(2px)',
+                        opacity: deleteModalVisible ? 1 : 0,
+                        transition: 'opacity 200ms ease-out',
+                    }}
+                    onClick={closeDeleteModal}
+                >
+                    <div
+                        className="bg-white rounded-2xl w-full max-w-sm shadow-xl"
+                        style={{
+                            transform: deleteModalVisible ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(8px)',
+                            opacity: deleteModalVisible ? 1 : 0,
+                            transition: 'transform 220ms cubic-bezier(0.32,0.72,0,1), opacity 200ms ease-out',
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                </div>
+                                <h3 className="font-bold text-gray-900">Xóa buổi đánh?</h3>
+                            </div>
+                            <button onClick={closeDeleteModal} className="p-1 text-gray-400 hover:text-gray-600">
+                                <XCircle className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-5">
+                            <p className="text-sm text-gray-500">
+                                Xóa buổi <strong className="text-gray-700">"{deleteTarget.title}"</strong>? Hành động này không thể hoàn tác.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100">
+                            <button onClick={closeDeleteModal} className="btn-secondary text-sm">
+                                Hủy
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={actionId === deleteTarget.id}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                            >
+                                Xóa buổi
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );

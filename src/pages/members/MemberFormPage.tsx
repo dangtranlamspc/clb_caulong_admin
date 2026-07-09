@@ -1,13 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { ArrowLeft, Save, Loader2, Key } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { usersApi } from '../../api';
+import { CustomSelect } from '../../components/customs/CustomSelect';
 
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+interface SelectOption {
+  value: string;
+  label: string;
+}
 
-const LEVEL_OPTIONS = [
+const SIZE_OPTIONS: SelectOption[] = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'].map((s) => ({
+  value: s,
+  label: s,
+}));
+
+const GENDER_OPTIONS: SelectOption[] = [
+  { value: 'male', label: 'Nam' },
+  { value: 'female', label: 'Nữ' },
+  { value: 'other', label: 'Khác' },
+];
+
+const LEVEL_OPTIONS: SelectOption[] = [
   { value: '', label: 'Chưa xác định' },
   { value: 'yeu', label: 'Yếu' },
   { value: 'tb_yeu', label: 'TB yếu' },
@@ -15,6 +30,21 @@ const LEVEL_OPTIONS = [
   { value: 'tb_plus', label: 'TB+' },
   { value: 'ban_chuyen', label: 'Bán chuyên (BC)' },
   { value: 'chuyen_nghiep', label: 'Chuyên nghiệp' },
+];
+
+const MEMBER_TYPE_OPTIONS: SelectOption[] = [
+  { value: 'vang_lai', label: 'Vãng lai' },
+  { value: 'co_dinh', label: 'Thành viên' },
+];
+
+const MEMBER_SUBTYPE_OPTIONS: SelectOption[] = [
+  { value: 'thuong', label: 'Thường' },
+  { value: 'vip', label: 'VIP' },
+];
+
+const ROLE_OPTIONS: SelectOption[] = [
+  { value: 'member', label: 'Thành viên' },
+  { value: 'admin', label: 'Admin' },
 ];
 
 export default function MemberFormPage() {
@@ -27,7 +57,7 @@ export default function MemberFormPage() {
   const [newPw, setNewPw] = useState('');
   const [attendanceInfo, setAttendanceInfo] = useState<{ count: number; label: string } | null>(null);
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm();
+  const { register, control, handleSubmit, reset, watch, formState: { errors } } = useForm();
   const memberType = watch('member_type');
 
   useEffect(() => {
@@ -204,48 +234,89 @@ export default function MemberFormPage() {
           {/* Gender */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
-            <select {...register('gender')} className="input-field">
-              <option value="">Chọn giới tính</option>
-              <option value="male">Nam</option>
-              <option value="female">Nữ</option>
-              <option value="other">Khác</option>
-            </select>
+            <Controller
+              name="gender"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <CustomSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={GENDER_OPTIONS}
+                  placeholder="Chọn giới tính"
+                />
+              )}
+            />
           </div>
 
           {/* Shirt size */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Size áo</label>
-            <select {...register('shirt_size')} className="input-field">
-              <option value="">Chọn size</option>
-              {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <Controller
+              name="shirt_size"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <CustomSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={SIZE_OPTIONS}
+                  placeholder="Chọn size"
+                />
+              )}
+            />
           </div>
 
           {/* Trình độ */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Trình độ</label>
-            <select {...register('level')} className="input-field">
-              {LEVEL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <Controller
+              name="level"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <CustomSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={LEVEL_OPTIONS}
+                />
+              )}
+            />
           </div>
 
           {/* Member type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phân cấp thành viên</label>
-            <select {...register('member_type')} className="input-field">
-              <option value="vang_lai">Vãng lai</option>
-              <option value="co_dinh">Thành viên</option>
-            </select>
+            <Controller
+              name="member_type"
+              control={control}
+              defaultValue="vang_lai"
+              render={({ field }) => (
+                <CustomSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={MEMBER_TYPE_OPTIONS}
+                />
+              )}
+            />
           </div>
 
           {/* Member subtype — chỉ hiện khi là "Thành viên" */}
           {memberType === 'co_dinh' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Loại thành viên</label>
-              <select {...register('member_subtype')} className="input-field">
-                <option value="thuong">Thường</option>
-                <option value="vip">VIP</option>
-              </select>
+              <Controller
+                name="member_subtype"
+                control={control}
+                defaultValue="thuong"
+                render={({ field }) => (
+                  <CustomSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={MEMBER_SUBTYPE_OPTIONS}
+                  />
+                )}
+              />
             </div>
           )}
 
@@ -266,10 +337,18 @@ export default function MemberFormPage() {
           {/* Role */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
-            <select {...register('role')} className="input-field">
-              <option value="member">Thành viên</option>
-              <option value="admin">Admin</option>
-            </select>
+            <Controller
+              name="role"
+              control={control}
+              defaultValue="member"
+              render={({ field }) => (
+                <CustomSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={ROLE_OPTIONS}
+                />
+              )}
+            />
           </div>
         </div>
 

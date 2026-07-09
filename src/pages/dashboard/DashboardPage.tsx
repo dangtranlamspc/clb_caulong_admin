@@ -14,9 +14,18 @@ import { vi } from 'date-fns/locale';
 type LeaderRow = {
   id: string;
   full_name: string;
+  avatar_url?: string | null;
   rank_label: string;
   points: number;
   badge: 'fire' | 'verified' | null;
+};
+
+type AttendanceLeaderRow = {
+  id: string;
+  full_name: string;
+  avatar_url?: string | null;
+  sessions_this_month: number;
+  total_sessions: number;
 };
 
 type NotificationRow = {
@@ -58,6 +67,44 @@ const FINANCE_PERIOD_OPTIONS = [
   { value: 12, label: '1 năm' },
 ];
 
+// Cấp độ chuyên cần theo tổng số buổi tham gia (dùng cho tab "Top chuyên cần")
+const ATTENDANCE_TIERS = [
+  { min: 0, max: 1, icon: '🥚', label: 'Người Mới Tham Gia' },
+  { min: 2, max: 5, icon: '🏸', label: 'Làm Quen Sân' },
+  { min: 6, max: 12, icon: '💪', label: 'Bắt Nhịp' },
+  { min: 13, max: 25, icon: '⚡', label: 'Ổn Sân' },
+  { min: 26, max: 45, icon: '🔥', label: 'Thành Thạo Sân' },
+  { min: 46, max: 80, icon: '⭐', label: 'Gắn Bó CLB' },
+  { min: 81, max: 130, icon: '💎', label: 'Trụ Cột Sân' },
+  { min: 131, max: Infinity, icon: '👑', label: 'Lão Làng Sân Cầu' },
+];
+
+function getAttendanceTier(totalSessions: number) {
+  return ATTENDANCE_TIERS.find((t) => totalSessions >= t.min && totalSessions <= t.max) ?? ATTENDANCE_TIERS[0];
+}
+
+function rankBadgeClass(idx: number) {
+  if (idx === 0) return 'bg-amber-400 text-white';
+  if (idx === 1) return 'bg-slate-300 text-white';
+  if (idx === 2) return 'bg-orange-300 text-white';
+  return 'text-gray-400';
+}
+
+// Avatar dùng chung cho bảng xếp hạng — fallback icon khi không có avatar_url
+function LeaderAvatar({ src, name }: { src?: string | null; name: string }) {
+  const [err, setErr] = useState(false);
+  const show = src && !err;
+  return (
+    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
+      {show ? (
+        <img src={src} alt={name} className="w-full h-full object-cover" onError={() => setErr(true)} />
+      ) : (
+        <User className="w-4 h-4 text-slate-500" />
+      )}
+    </div>
+  );
+}
+
 function StatCard({ icon: Icon, iconBg, label, value, deltaLabel }: {
   icon: any; iconBg: string; label: string; value: number | string; deltaLabel?: string;
 }) {
@@ -97,6 +144,7 @@ export default function DashboardPage() {
   const [monthlyFinance, setMonthlyFinance] = useState({ income: 0, expense: 0 });
 
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
+  const [leaderboardAttendance, setLeaderboardAttendance] = useState<AttendanceLeaderRow[]>([]);
 
   const [notifications] = useState<NotificationRow[]>([
     { id: '1', icon: 'megaphone', title: 'Lịch đánh cuối tuần', message: 'Lịch đánh thứ 7 & chủ nhật (18-19/05) đã được cập nhật.', is_new: true },
@@ -111,7 +159,7 @@ export default function DashboardPage() {
     { id: '3', day: '08', month: 'JUN', color: 'purple', title: 'Giải nội bộ tháng 6', time: '07:30 - 17:00', location: 'Sân cầu lông Khang An' },
   ]);
 
-  const [leaderTab, setLeaderTab] = useState<'points' | 'revice'>('points');
+  const [leaderTab, setLeaderTab] = useState<'points' | 'attendance'>('points');
 
 
   const [financePeriod, setFinancePeriod] = useState(6);
@@ -140,10 +188,11 @@ export default function DashboardPage() {
       walletAdminApi.getSummary(),
       rankingsApi.rankLeaderboard(),
       walletAdminApi.getMonthlyFinance(),
+      rankingsApi.leaderboard(),
     ]).then((results) => {
       const [
         dashboardRes, countsRes,
-        todayRes, weekRes, monthRes, walletRes, leaderboardRes, financeRes,
+        todayRes, weekRes, monthRes, walletRes, leaderboardRes, financeRes, attendanceRes,
       ] = results;
 
       if (dashboardRes.status === 'fulfilled') setStats((dashboardRes.value as any).data);
@@ -171,11 +220,30 @@ export default function DashboardPage() {
           rows.slice(0, 5).map((r) => ({
             id: r.id,
             full_name: r.full_name ?? 'Chưa rõ tên',
+            avatar_url: r.avatar_url ?? null,
             rank_label: r.tier ?? '—',
             points: r.total_points ?? 0,
             badge: null,
           })),
         );
+      }
+
+      if (attendanceRes.status === 'fulfilled') {
+        const rows = ((attendanceRes.value as any).data ?? []) as any[];
+        setLeaderboardAttendance(
+          [...rows]
+            .sort((a, b) => (b.sessions_this_month ?? 0) - (a.sessions_this_month ?? 0))
+            .slice(0, 5)
+            .map((r) => ({
+              id: r.id,
+              full_name: r.full_name ?? 'Chưa rõ tên',
+              avatar_url: r.avatar_url ?? null,
+              sessions_this_month: r.sessions_this_month ?? 0,
+              total_sessions: r.total_sessions ?? 0,
+            })),
+        );
+      } else {
+        console.error('rankingsApi.leaderboard() failed:', (attendanceRes as any).reason);
       }
 
       if (financeRes.status === 'fulfilled') {
@@ -409,48 +477,78 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Bảng xếp hạng</h3>
           </div>
-          <div className="flex items-center gap-4 border-b border-gray-100 mb-3 text-sm">
+
+          {/* Tabs dạng nút, canh giữa */}
+          <div className="flex items-center justify-center gap-2 mb-4">
             <button
               onClick={() => setLeaderTab('points')}
-              className={`pb-2 -mb-px border-b-2 font-medium transition-colors ${leaderTab === 'points' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors duration-150 ${leaderTab === 'points'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
             >
               Top điểm
             </button>
             <button
-              onClick={() => setLeaderTab('revice')}
-              className={`pb-2 -mb-px border-b-2 font-medium transition-colors ${leaderTab === 'revice' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+              onClick={() => setLeaderTab('attendance')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors duration-150 ${leaderTab === 'attendance'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
             >
-              Top chuyền cần
+              Top chuyên cần
             </button>
           </div>
 
           <div className="space-y-1 flex-1">
-            {leaderboard.map((p, idx) => (
-              <div key={p.id} className="flex items-center gap-3 py-1.5">
-                <span
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${idx === 0 ? 'bg-amber-400 text-white' : idx === 1 ? 'bg-slate-300 text-white' : idx === 2 ? 'bg-orange-300 text-white' : 'text-gray-400'
-                    }`}
-                >
-                  {idx === 0 ? <Flame className="w-3.5 h-3.5" /> : idx + 1}
-                </span>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-slate-500" />
+            {leaderTab === 'points' ? (
+              leaderboard.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">Chưa có dữ liệu</p>
+              ) : leaderboard.map((p, idx) => (
+                <div key={p.id} className="flex items-center gap-3 py-1.5">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${rankBadgeClass(idx)}`}>
+                    {idx === 0 ? <Flame className="w-3.5 h-3.5" /> : idx + 1}
+                  </span>
+                  <LeaderAvatar src={p.avatar_url} name={p.full_name} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-800 truncate flex items-center gap-1">
+                      {p.full_name}
+                      {p.badge === 'verified' && <BadgeCheck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />}
+                    </p>
+                    <p className="text-[11px] text-gray-400">Rank: {p.rank_label}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-bold text-gray-800">{p.points.toLocaleString('vi-VN')}</p>
+                    <p className="text-[10px] text-gray-400">điểm</p>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-gray-800 truncate flex items-center gap-1">
-                    {p.full_name}
-                    {p.badge === 'verified' && <BadgeCheck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />}
-                  </p>
-                  <p className="text-[11px] text-gray-400">Rank: {p.rank_label}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-bold text-gray-800">{p.points.toLocaleString('vi-VN')}</p>
-                  <p className="text-[10px] text-gray-400">điểm</p>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              leaderboardAttendance.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">Chưa có dữ liệu</p>
+              ) : leaderboardAttendance.map((p, idx) => {
+                const tier = getAttendanceTier(p.total_sessions);
+                return (
+                  <div key={p.id} className="flex items-center gap-3 py-1.5">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${rankBadgeClass(idx)}`}>
+                      {idx === 0 ? <Flame className="w-3.5 h-3.5" /> : idx + 1}
+                    </span>
+                    <LeaderAvatar src={p.avatar_url} name={p.full_name} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{p.full_name}</p>
+                      <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                        <span>{tier.icon}</span>
+                        <span className="truncate">{tier.label}</span>
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-gray-800">{p.sessions_this_month}</p>
+                      <p className="text-[10px] text-gray-400">buổi</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           <button className="mt-3 text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
