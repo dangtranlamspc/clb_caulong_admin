@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Eye, EyeOff, Shield, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authApi } from '../../api';
 import { useAuthStore } from '../../stores/auth.store';
@@ -21,7 +21,6 @@ export default function LoginPage() {
       toast.success(`Chào mừng, ${data.user.full_name}!`);
       navigate('/');
     } catch {
-      // error handled by interceptor
     } finally {
       setLoading(false);
     }
@@ -32,10 +31,14 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg">
-            <Shield className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-32 h-32 mb-4">
+            <img
+              src="https://res.cloudinary.com/ds6mtnyyk/image/upload/v1783494767/LOGO_TEAM_BNB_WHITE_hs59vg.png"
+              alt="Team BNB"
+              className="w-full h-full object-contain"
+            />
           </div>
-          <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
+          <h1 className="text-2xl font-bold text-white">BNB BADMINTON CLUB</h1>
           <p className="text-slate-400 mt-1 text-sm">Hệ thống quản lý thành viên</p>
         </div>
 
