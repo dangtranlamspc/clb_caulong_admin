@@ -883,7 +883,6 @@ export default function SessionDetailPage() {
                 )}
 
                 {/* ── Add member modal ── */}
-                {/* ── Add member modal ── */}
                 {showAddModal && typeof document !== 'undefined' && createPortal(
                     <div
                         className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -893,7 +892,6 @@ export default function SessionDetailPage() {
                             opacity: addModalVisible ? 1 : 0,
                             transition: 'opacity 200ms ease-out',
                         }}
-                        onClick={closeAddModal}
                     >
                         <div
                             className="bg-white rounded-2xl w-full max-w-md shadow-xl"
