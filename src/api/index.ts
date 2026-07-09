@@ -140,4 +140,5 @@ export const walletAdminApi = {
     api.get('/wallet/admin/finance-history', { params }),
 
   getFinanceYears: () => api.get('/wallet/admin/finance-years'),
+  exportReport: () => api.get('/wallet/admin/export', { responseType: 'blob' }),
 };

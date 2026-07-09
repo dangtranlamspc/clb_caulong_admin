@@ -136,7 +136,7 @@ function MemberPanel({ member, onClose, onChanged, onSelectTx }: {
 
     return (
         <div className="flex flex-col h-full bg-white lg:border-l border-gray-100">
-            <div className="flex items-start justify-between p-4 sm:p-5 border-b border-gray-100">
+            <div className="flex items-start justify-between p-4 sm:p-5 border-b border-gray-100 flex-shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-base sm:text-lg font-bold text-white flex-shrink-0 overflow-hidden">
                         {member.avatar_url ? (
@@ -161,14 +161,14 @@ function MemberPanel({ member, onClose, onChanged, onSelectTx }: {
                 </button>
             </div>
 
-            <div className="px-4 sm:px-5 py-4 border-b border-gray-100">
+            <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex-shrink-0">
                 <p className="text-xs text-gray-400 mb-1">Số dư ví hiện tại</p>
                 <p className={`text-2xl sm:text-3xl font-black ${member.balance < 0 ? 'text-red-500' : 'text-gray-900'}`}>
                     {fmt(member.balance)}
                 </p>
             </div>
 
-            <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex gap-2">
+            <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex gap-2 flex-shrink-0">
                 <button onClick={() => { setShowTopup(true); setShowAdjust(false); }}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition-transform duration-150 active:scale-95 text-white text-xs sm:text-sm font-semibold">
                     <Plus className="w-3.5 h-3.5" /> Nạp tiền
@@ -180,7 +180,7 @@ function MemberPanel({ member, onClose, onChanged, onSelectTx }: {
             </div>
 
             <div
-                className={`grid transition-[grid-template-rows] duration-300 ease-out ${formOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                className={`grid transition-[grid-template-rows] duration-300 ease-out flex-shrink-0 ${formOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
                     }`}
             >
                 <div className="overflow-hidden">
@@ -230,7 +230,7 @@ function MemberPanel({ member, onClose, onChanged, onSelectTx }: {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto overscroll-contain">
+            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
                 <div className="px-4 sm:px-5 pt-4 pb-2">
                     <p className="font-bold text-gray-900 text-sm">Lịch sử giao dịch</p>
                 </div>
@@ -296,6 +296,8 @@ export default function WalletAdminSummaryPage() {
     const [panelOpen, setPanelOpen] = useState(false);
 
     const [selectedTx, setSelectedTx] = useState<any>(null);
+
+    const [exporting, setExporting] = useState(false);
 
     const fetchSummary = useCallback(async () => {
         const { data } = await walletAdminApi.getSummary();
@@ -386,6 +388,24 @@ export default function WalletAdminSummaryPage() {
         setPage(1);
     };
 
+    const handleExportReport = async () => {
+        setExporting(true);
+        try {
+            const { data } = await walletAdminApi.exportReport();
+            const url = URL.createObjectURL(new Blob([data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bao-cao-vi-clb-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast.success('Xuất báo cáo thành công!');
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message ?? 'Xuất báo cáo thất bại');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const SortIcon = ({ field }: { field: SortField }) => {
         if (sortField !== field) return <ArrowUpDown className="w-3 h-3 text-gray-300" />;
         return sortOrder === 'desc'
@@ -442,6 +462,14 @@ export default function WalletAdminSummaryPage() {
                     <Wallet className="w-5 h-5 text-blue-600" />
                     <span className="font-bold text-gray-900 text-base sm:text-lg">Ví BNB</span>
                 </div>
+                <button
+                    onClick={handleExportReport}
+                    disabled={exporting}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                    {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{exporting ? 'Đang xuất...' : 'Xuất báo cáo Excel'}</span>
+                </button>
             </div>
 
             <div className="px-3 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
@@ -583,7 +611,6 @@ export default function WalletAdminSummaryPage() {
                             </table>
                         </div>
 
-                        {/* ── Phân trang: xếp dọc trên mobile ── */}
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-5 py-3 border-t border-gray-100">
                             <p className="text-xs text-gray-400 order-2 sm:order-1">
                                 Hiển thị {(page - 1) * perPage + 1} – {Math.min(page * perPage, meta.total ?? 0)} của {meta.total ?? 0} thành viên
@@ -617,8 +644,9 @@ export default function WalletAdminSummaryPage() {
                             />
                             <div
                                 ref={panelRef}
-                                className={`fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] rounded-t-2xl overflow-hidden flex flex-col
-                                    lg:static lg:z-auto lg:w-[420px] lg:flex-shrink-0 lg:rounded-xl lg:max-h-[calc(100dvh-200px)]
+                                className={`fixed inset-x-0 bottom-0 z-50 h-[85dvh] max-h-[85dvh] rounded-t-2xl overflow-hidden flex flex-col
+                                    lg:static lg:z-auto lg:w-[420px] lg:flex-shrink-0 lg:rounded-xl
+                                    lg:h-[calc(100dvh-200px)] lg:max-h-[calc(100dvh-200px)]
                                     bg-white shadow-sm border border-gray-100 transform-gpu overscroll-contain
                                     transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform
                                     ${panelOpen
@@ -629,7 +657,7 @@ export default function WalletAdminSummaryPage() {
                                 <div className="lg:hidden flex justify-center pt-2 pb-1 flex-shrink-0">
                                     <span className="w-10 h-1 rounded-full bg-gray-200" />
                                 </div>
-                                <div className="flex-1 min-h-0 overscroll-contain">
+                                <div className="flex-1 min-h-0 overscroll-contain flex flex-col">
                                     <MemberPanel
                                         member={panelMember}
                                         onClose={() => setSelectedMember(null)}
