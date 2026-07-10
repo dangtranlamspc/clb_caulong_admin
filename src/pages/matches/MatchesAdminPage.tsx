@@ -339,7 +339,6 @@ export default function MatchesAdminPage() {
                                     </div>
                                 </div>
 
-                                {/* Row 2: Set scores + meta + actions */}
                                 <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-50">
                                     <div className="flex flex-col gap-1.5">
                                         <div className="flex items-center gap-3 text-xs text-gray-400">
@@ -355,9 +354,7 @@ export default function MatchesAdminPage() {
                                         </div>
                                     </div>
 
-                                    {/* Right-side actions */}
                                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                        {/* Approve / Reject buttons */}
                                         {canApprove && showReject !== m.id && showScoreInput !== m.id && (
                                             <div className="flex gap-2">
                                                 <button
@@ -380,7 +377,6 @@ export default function MatchesAdminPage() {
                                             </div>
                                         )}
 
-                                        {/* Approved info */}
                                         {m.status === 'approved' && (
                                             <div className="text-right">
                                                 <p className="text-xs text-green-600 font-medium">✅ Đã tính điểm</p>
@@ -392,7 +388,6 @@ export default function MatchesAdminPage() {
                                             </div>
                                         )}
 
-                                        {/* Rejected info */}
                                         {m.status === 'rejected' && m.reject_reason && !m.reject_reason.includes('chưa') && (
                                             <p className="text-xs text-red-500 max-w-[160px] text-right">{m.reject_reason}</p>
                                         )}
@@ -412,7 +407,6 @@ export default function MatchesAdminPage() {
                                             }
                                         </button>
 
-                                        {/* Confirm xóa */}
                                         {deleteId === m.id && (
                                             <div className="flex items-center gap-2 pt-1 bg-red-50 border border-red-100 rounded-lg p-2.5">
                                                 <p className="text-xs text-red-600 flex-1">
@@ -434,7 +428,6 @@ export default function MatchesAdminPage() {
                                             </div>
                                         )}
 
-                                        {/* Confirm thu hồi */}
                                         {rollbackId === m.id && (
                                             <div className="flex items-center gap-2 pt-1 bg-orange-50 border border-orange-100 rounded-lg p-2.5">
                                                 <p className="text-xs text-orange-700 flex-1">
@@ -476,11 +469,10 @@ export default function MatchesAdminPage() {
                                         className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors disabled:opacity-50"
                                         title="Thu hồi kết quả, hủy tỉ số và thu hồi điểm"
                                     >
-                                        <Undo2 className="w-3 h-3" /> Thu hồi
+                                        <Undo2 className="w-3 h-3" /> Hoàn tác
                                     </button>
                                 )}
 
-                                {/* ── Input nhập tỉ số khi duyệt thẳng từ pending_result ── */}
                                 {showScoreInput === m.id && (
                                     <div className="flex items-center gap-2 pt-1">
                                         <input
@@ -523,7 +515,6 @@ export default function MatchesAdminPage() {
                                     </div>
                                 )}
 
-                                {/* Reject input */}
                                 {showReject === m.id && (
                                     <div className="flex gap-2 pt-1">
                                         <input
@@ -566,7 +557,6 @@ export default function MatchesAdminPage() {
                 />
             )}
 
-            {/* Pagination */}
             {meta.total_pages > 1 && (
                 <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-500">
