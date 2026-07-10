@@ -109,6 +109,7 @@ export const matchesApi = {
   adminCreate: (data: any) => api.post('/matches/admin-create', data),
   delete: (id: string) => api.delete(`/matches/${id}`),
   rollback: (id: string) => api.patch(`/matches/${id}/rollback`),
+  statusCounts: () => api.get('/matches/status-counts'),
 };
 
 export const rankingsApi = {

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, Trophy, Users, Crown, Calendar, ChevronDown } from 'lucide-react';
 import { rankingsApi } from '../../api';
 import { getTierConfig } from './rankConfig';
-import { RankPodiumAvatarList } from '../../components/Rank_for_list';
 
 const ATTENDANCE_TIERS = [
     { min: 0, max: 1, icon: '🥚', label: 'Người Mới Tham Gia' },
@@ -132,6 +131,27 @@ function DeltaText({ delta, suffix }: { delta: number; suffix: string }) {
     return <span className="inline-flex items-center text-xs font-medium text-gray-400">-</span>;
 }
 
+function ProgressBar({ percent, gradientClass }: { percent: number; gradientClass: string }) {
+    const [width, setWidth] = useState(0);
+
+    useEffect(() => {
+        setWidth(0);
+        const t = setTimeout(() => setWidth(percent), 50);
+        return () => clearTimeout(t);
+    }, [percent]);
+
+    return (
+        <div className="relative flex-1 h-2 sm:h-2.5 bg-gray-100 rounded-full overflow-hidden min-w-[40px] sm:min-w-[60px]">
+            <div
+                className={`h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden ${gradientClass}`}
+                style={{ width: `${width}%` }}
+            >
+                <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+            </div>
+        </div>
+    );
+}
+
 function Avatar({ src, name, size = 40 }: { src?: string | null; name: string; size?: number }) {
     const [err, setErr] = useState(false);
     const show = src && !err;
@@ -214,8 +234,10 @@ function SessionTable({ data, prevMonthLabel }: { data: any[]; prevMonthLabel: s
                 <tbody className="divide-y divide-gray-50">
                     {data.map((m, idx) => {
                         const pos = idx + 4;
-                        const total = m.total_registrations ?? m.sessions_this_month ?? 0;
-                        const rate = total > 0 ? Math.min(100, (m.sessions_this_month / total) * 100) : 0;
+                        const totalClubSessions = m.total_sessions_in_month ?? 0;
+                        const rate = totalClubSessions > 0
+                            ? Math.min(100, (m.sessions_this_month / totalClubSessions) * 100)
+                            : 0;
                         return (
                             <tr key={m.id} className="hover:bg-gray-50">
                                 <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-gray-400 font-medium">{pos}</td>
@@ -231,13 +253,10 @@ function SessionTable({ data, prevMonthLabel }: { data: any[]; prevMonthLabel: s
                                 <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-center font-semibold text-gray-700 whitespace-nowrap">{m.sessions_this_month} buổi</td>
                                 <td className="px-2 sm:px-3 py-2 sm:py-2.5">
                                     <div className="flex items-center gap-1.5 sm:gap-2">
-                                        <div className="flex-1 h-2 sm:h-2.5 bg-gray-100 rounded-full overflow-hidden min-w-[40px] sm:min-w-[60px]">
-                                            <div
-                                                className="h-full rounded-full bg-emerald-500 transition-all duration-700 ease-out"
-                                                style={{ width: `${rate}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-[10px] sm:text-xs text-gray-500 flex-shrink-0">{rate.toFixed(0)}%</span>
+                                        <ProgressBar percent={rate} gradientClass="bg-emerald-500" />
+                                        <span className="text-[10px] sm:text-xs text-gray-500 flex-shrink-0 whitespace-nowrap">
+                                            {m.sessions_this_month}/{totalClubSessions} ({rate.toFixed(0)}%)
+                                        </span>
                                     </div>
                                 </td>
                                 <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right">
@@ -291,12 +310,7 @@ function RankTable({ data }: { data: any[] }) {
                                 </td>
                                 <td className="px-2 sm:px-3 py-2 sm:py-2.5">
                                     <div className="flex items-center gap-1.5 sm:gap-2 justify-end">
-                                        <div className="flex-1 h-2 sm:h-2.5 bg-gray-100 rounded-full overflow-hidden min-w-[40px] sm:min-w-[70px]">
-                                            <div
-                                                className="h-full rounded-full bg-gradient-to-r from-violet-400 to-purple-600 transition-all duration-700 ease-out"
-                                                style={{ width: `${progressPct}%` }}
-                                            />
-                                        </div>
+                                        <ProgressBar percent={progressPct} gradientClass="bg-gradient-to-r from-violet-400 to-purple-600" />
                                         <span className="text-[10px] sm:text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
                                             {(p.points ?? 0)}/{POINTS_PER_TIER}
                                         </span>
@@ -391,7 +405,7 @@ export default function RankingsPage() {
                             {sessionRest.length > 0 && <SessionTable data={sessionRest} prevMonthLabel={prevMonthLabel} />}
                             <p className="text-[11px] text-gray-400 flex items-start gap-1.5 px-1">
                                 <span>ⓘ</span>
-                                <span>Tỷ lệ tham gia = (Số buổi đã tham gia / Tổng số lần đã đăng ký) × 100%. Chỉ tính các buổi trong tháng đã kết thúc.</span>
+                                <span>Tỷ lệ tham gia = (Số buổi thành viên đã tham gia trong tháng / Tổng số buổi CLB tổ chức trong tháng) × 100%.</span>
                             </p>
                         </>
                     )}

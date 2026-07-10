@@ -2,6 +2,53 @@ import { useEffect, useState } from "react";
 import { usersApi } from "../../api";
 import { Search } from "lucide-react";
 
+const LEVEL_LABEL: Record<string, string> = {
+    yeu: 'Yếu',
+    tb_yeu: 'TB yếu',
+    tb: 'TB',
+    tb_plus: 'TB+',
+    ban_chuyen: 'Bán chuyên (BC)',
+    chuyen_nghiep: 'Chuyên nghiệp',
+};
+
+const DEFAULT_TIER = 'Tân thủ';
+
+const TIER_STYLE: Record<string, string> = {
+    'Tân thủ': 'bg-gray-100 text-gray-500',
+    'Phong trào': 'bg-slate-100 text-slate-600',
+    'Cứng cựa': 'bg-sky-50 text-sky-700',
+    'Chủ lực': 'bg-blue-50 text-blue-700',
+    'Cao thủ': 'bg-indigo-50 text-indigo-700',
+    'Kiện tướng': 'bg-purple-50 text-purple-700',
+    'Đại Kiện Tướng': 'bg-fuchsia-50 text-fuchsia-700',
+    'Huyền Thoại': 'bg-amber-100 text-amber-700',
+};
+
+function getTier(m: any): string {
+    const pr = m.player_ranks;
+    const tier = Array.isArray(pr) ? pr[0]?.tier : pr?.tier;
+    return tier ?? DEFAULT_TIER;
+}
+
+function PlayerMeta({ m }: { m: any }) {
+    const level = LEVEL_LABEL[m.level] ?? m.level;
+    const tier = getTier(m);
+    const tierCls = TIER_STYLE[tier] ?? 'bg-gray-100 text-gray-500';
+
+    return (
+        <div className="flex items-center gap-1 mt-0.5">
+            {level && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-700 leading-none">
+                    {level}
+                </span>
+            )}
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none ${tierCls}`}>
+                {tier}
+            </span>
+        </div>
+    );
+}
+
 export function PlayerPickerField({ label, value, onSelect, exclude }: {
     label: string;
     value: any;
@@ -29,11 +76,18 @@ export function PlayerPickerField({ label, value, onSelect, exclude }: {
             <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
                 <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
-                    <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-700 flex-shrink-0">
-                        {value.full_name?.[0]?.toUpperCase()}
+                    {value.avatar_url ? (
+                        <img src={value.avatar_url} alt={value.full_name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-700 flex-shrink-0">
+                            {value.full_name?.[0]?.toUpperCase()}
+                        </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-gray-900 truncate block">{value.full_name}</span>
+                        <PlayerMeta m={value} />
                     </div>
-                    <span className="text-sm font-medium text-gray-900 flex-1 truncate">{value.full_name}</span>
-                    <button onClick={() => onSelect(null)} className="text-xs text-blue-600 font-medium">Đổi</button>
+                    <button onClick={() => onSelect(null)} className="text-xs text-blue-600 font-medium flex-shrink-0">Đổi</button>
                 </div>
             </div>
         );
@@ -64,12 +118,16 @@ export function PlayerPickerField({ label, value, onSelect, exclude }: {
                                 onClick={() => { onSelect(m); setSearch(''); }}
                                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-left"
                             >
-                                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-700 flex-shrink-0">
-                                    {m.full_name?.[0]?.toUpperCase()}
-                                </div>
+                                {m.avatar_url ? (
+                                    <img src={m.avatar_url} alt={m.full_name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                    <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-700 flex-shrink-0">
+                                        {m.full_name?.[0]?.toUpperCase()}
+                                    </div>
+                                )}
                                 <div className="min-w-0">
                                     <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
-                                    <p className="text-xs text-gray-400">{m.phone}</p>
+                                    <PlayerMeta m={m} />
                                 </div>
                             </button>
                         ))

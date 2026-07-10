@@ -2,24 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     CheckCircle2, XCircle, Hourglass, Clock,
     ChevronLeft, ChevronRight, RefreshCw,
-    Swords, Users, Trophy, EyeOff, Eye,
-    Plus,
-    Trash2,
-    Undo2,
+    Swords, Users, Trophy, EyeOff,
+    Plus, Trash2, Undo2, Calendar,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { api, matchesApi } from '../../api';
 import { CreateMatchModal } from '../../components/matches/CreateMatchModal';
-
+import { createPortal } from 'react-dom';
+import { ConfirmModal } from '../../components/matches/ConfirmModal';
 
 const STATUS_TABS = [
-    { value: '', label: 'Tất cả', icon: RefreshCw, cls: 'text-gray-500' },
-    { value: 'pending_approval', label: 'Chờ duyệt', icon: Hourglass, cls: 'text-amber-600' },
-    { value: 'approved', label: 'Đã duyệt', icon: CheckCircle2, cls: 'text-green-600' },
-    { value: 'rejected', label: 'Từ chối', icon: XCircle, cls: 'text-red-500' },
-    { value: 'pending_result', label: 'Chờ kết quả', icon: Clock, cls: 'text-blue-500' },
+    { value: '', label: 'Tất cả', icon: RefreshCw },
+    { value: 'pending_approval', label: 'Chờ duyệt', icon: Hourglass },
+    { value: 'approved', label: 'Đã duyệt', icon: CheckCircle2 },
+    { value: 'rejected', label: 'Từ chối', icon: XCircle },
+    { value: 'pending_result', label: 'Chờ kết quả', icon: Clock },
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -30,6 +29,22 @@ const STATUS_BADGE: Record<string, string> = {
     rejected: 'bg-red-50 text-red-600 border-red-200',
 };
 
+const STATUS_COUNT_BADGE: Record<string, string> = {
+    pending_approval: 'bg-amber-100 text-amber-700',
+    approved: 'bg-green-100 text-green-700',
+    rejected: 'bg-red-100 text-red-700',
+    pending_result: 'bg-blue-100 text-blue-700',
+    '': 'bg-gray-200 text-gray-700',
+};
+
+const STATUS_ACCENT: Record<string, string> = {
+    pending_opponent: 'border-l-gray-300',
+    pending_result: 'border-l-blue-400',
+    pending_approval: 'border-l-amber-400',
+    approved: 'border-l-green-400',
+    rejected: 'border-l-red-400',
+};
+
 const STATUS_LABEL: Record<string, string> = {
     pending_opponent: 'Chờ đối thủ',
     pending_result: 'Chờ kết quả',
@@ -38,27 +53,63 @@ const STATUS_LABEL: Record<string, string> = {
     rejected: 'Từ chối',
 };
 
+const LEVEL_LABEL: Record<string, string> = {
+    yeu: 'Yếu',
+    tb_yeu: 'TB yếu',
+    tb: 'TB',
+    tb_plus: 'TB+',
+    ban_chuyen: 'BC',
+    chuyen_nghiep: 'Chuyên nghiệp',
+};
 
-function PlayerAvatar({ p, teamCls }: { p: any; teamCls: string }) {
-    return p?.avatar_url
-        ? <img src={p.avatar_url} alt={p.full_name} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
-        : <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${teamCls}`}>
-            {p?.full_name?.[0]?.toUpperCase()}
-        </div>;
+const TIER_STYLE: Record<string, string> = {
+    'Tân thủ': 'bg-gray-100 text-gray-500',
+    'Phong trào': 'bg-slate-100 text-slate-600',
+    'Cứng cựa': 'bg-sky-50 text-sky-700',
+    'Chủ lực': 'bg-blue-50 text-blue-700',
+    'Cao thủ': 'bg-indigo-50 text-indigo-700',
+    'Kiện tướng': 'bg-purple-50 text-purple-700',
+    'Đại Kiện Tướng': 'bg-fuchsia-50 text-fuchsia-700',
+    'Huyền Thoại': 'bg-amber-100 text-amber-700',
+};
+
+const DEFAULT_TIER = 'Tân thủ';
+
+function getTier(p: any): string {
+    const pr = p?.player_ranks;
+    const tier = Array.isArray(pr) ? pr[0]?.tier : pr?.tier;
+    return tier ?? DEFAULT_TIER;
 }
 
-function PlayerNames({ p1, p2 }: { p1: any; p2?: any }) {
+function PlayerRow({ p, align = 'left' }: { p: any; align?: 'left' | 'right' }) {
+    if (!p) return null;
+    const level = LEVEL_LABEL[p.level] ?? p.level;
+    const tier = getTier(p);
+    const tierCls = TIER_STYLE[tier] ?? 'bg-gray-100 text-gray-500';
+    const isRight = align === 'right';
+
     return (
-        <div className="flex items-center gap-1.5">
-            <PlayerAvatar p={p1} teamCls="bg-blue-100 text-blue-700" />
-            <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">{p1?.full_name}</span>
-            {p2 && (
-                <>
-                    <span className="text-gray-300">/</span>
-                    <PlayerAvatar p={p2} teamCls="bg-blue-100 text-blue-700" />
-                    <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">{p2?.full_name}</span>
-                </>
+        <div className={`flex items-center gap-2 ${isRight ? 'flex-row-reverse' : ''}`}>
+            {p.avatar_url ? (
+                <img src={p.avatar_url} alt={p.full_name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+            ) : (
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    {p.full_name?.[0]?.toUpperCase()}
+                </div>
             )}
+            <div className={`min-w-0 flex-1 ${isRight ? 'text-right' : ''}`}>
+                <p className="text-sm font-medium text-gray-900 truncate">{p.full_name}</p>
+                <div className={`flex flex-wrap items-center gap-1 mt-0.5 ${isRight ? 'justify-end' : ''}`}>
+                    {level && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-700 leading-none whitespace-nowrap">
+                            {level}
+                        </span>
+                    )}
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none whitespace-nowrap ${tierCls}`}>
+                        {tier}
+                    </span>
+                </div>
+            </div>
         </div>
     );
 }
@@ -67,7 +118,7 @@ export default function MatchesAdminPage() {
     const [matches, setMatches] = useState<any[]>([]);
     const [meta, setMeta] = useState<any>({});
     const [loading, setLoading] = useState(true);
-    const [activeTab, setTab] = useState('pending_approval');
+    const [activeTab, setTab] = useState('');
     const [page, setPage] = useState(1);
     const [actionId, setActionId] = useState<string | null>(null);
     const [showReject, setShowReject] = useState<string | null>(null);
@@ -78,6 +129,15 @@ export default function MatchesAdminPage() {
     const [scoreInputs, setScoreInputs] = useState<Record<string, { score_a: string; score_b: string }>>({});
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [rollbackId, setRollbackId] = useState<string | null>(null);
+    const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+
+    const fetchStatusCounts = useCallback(async () => {
+        try {
+            const { data } = await matchesApi.statusCounts();
+            setStatusCounts(data ?? {});
+        } catch {
+        }
+    }, []);
 
     const fetchMatches = useCallback(async () => {
         setLoading(true);
@@ -99,6 +159,7 @@ export default function MatchesAdminPage() {
     }, [activeTab, page]);
 
     useEffect(() => { fetchMatches(); }, [fetchMatches]);
+    useEffect(() => { fetchStatusCounts(); }, [fetchStatusCounts]);
     useEffect(() => { setPage(1); }, [activeTab]);
 
     const handleApprove = async (id: string, scorePayload?: { score_a: number; score_b: number }) => {
@@ -132,6 +193,7 @@ export default function MatchesAdminPage() {
 
             setShowScoreInput(null);
             fetchMatches();
+            fetchStatusCounts();
         } catch (err: any) {
             toast.error(err?.response?.data?.message ?? 'Duyệt thất bại');
         } finally {
@@ -172,6 +234,7 @@ export default function MatchesAdminPage() {
             toast.success('Đã từ chối kết quả trận');
             setShowReject(null);
             fetchMatches();
+            fetchStatusCounts();
         } finally {
             setActionId(null);
         }
@@ -196,6 +259,7 @@ export default function MatchesAdminPage() {
             toast.success('🗑️ Đã xóa vĩnh viễn trận đấu');
             setDeleteId(null);
             fetchMatches();
+            fetchStatusCounts();
         } catch (err: any) {
             toast.error(err?.response?.data?.message ?? 'Xóa thất bại');
         } finally {
@@ -210,6 +274,7 @@ export default function MatchesAdminPage() {
             toast.success(data.message ?? '↩️ Đã thu hồi kết quả trận đấu');
             setRollbackId(null);
             fetchMatches();
+            fetchStatusCounts();
         } catch (err: any) {
             toast.error(err?.response?.data?.message ?? 'Thu hồi thất bại');
         } finally {
@@ -236,166 +301,256 @@ export default function MatchesAdminPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
-                {STATUS_TABS.map(({ value, label, icon: Icon, cls }) => (
-                    <button
-                        key={value}
-                        onClick={() => setTab(value)}
-                        className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === value
-                            ? 'border-blue-600 text-blue-700'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        <Icon className={`w-4 h-4 ${activeTab === value ? 'text-blue-600' : cls}`} />
-                        {label}
-                    </button>
-                ))}
-                <div className="flex-1" />
-                <span className="self-center text-sm text-gray-400 pr-2">{meta.total ?? 0} trận</span>
+            <div className="flex items-center gap-3">
+                <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {STATUS_TABS.map(({ value, label, icon: Icon }) => {
+                        const count = value ? statusCounts[value] ?? 0 : statusCounts.total ?? 0;
+                        const showDot = value === 'pending_approval' && count > 0;
+                        const showCount = value !== 'pending_approval' && count > 0;
+                        const isActive = activeTab === value;
+                        const badgeCls = STATUS_COUNT_BADGE[value] ?? 'bg-gray-200 text-gray-700';
+
+                        return (
+                            <button
+                                key={value}
+                                onClick={() => setTab(value)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${isActive
+                                    ? 'bg-white text-gray-900 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                <span className="relative inline-flex">
+                                    <Icon className="w-4 h-4" />
+                                    {showDot && (
+                                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
+                                    )}
+                                </span>
+                                {label}
+                                {showCount && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold leading-none ${badgeCls}`}>
+                                        {count}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+                <span className="text-sm text-gray-400 flex-shrink-0 ml-auto hidden sm:inline">{meta.total ?? 0} trận</span>
             </div>
 
             {/* List */}
             <div className="space-y-3">
                 {loading ? (
                     [...Array(4)].map((_, i) => (
-                        <div key={i} className="card h-28 animate-pulse bg-gray-100" />
+                        <div key={i} className="rounded-2xl h-32 animate-pulse bg-gray-100" />
                     ))
                 ) : matches.length === 0 ? (
-                    <div className="card py-16 text-center text-gray-400">
+                    <div className="rounded-2xl border border-gray-100 py-16 text-center text-gray-400">
                         <Swords className="w-8 h-8 mx-auto mb-2 opacity-20" />
                         <p>Không có trận nào</p>
                     </div>
                 ) : (
                     matches.map((m) => {
                         const busy = actionId === m.id;
-                        // Cho phép duyệt cả khi pending_result (admin tự nhập tỉ số) hoặc pending_approval (đã có tỉ số)
                         const canApprove = m.status === 'pending_approval' || m.status === 'pending_result';
                         const isHidden = hiddenMap[m.id] ?? false;
-
                         const hasScore = (m.status === 'approved' || m.status === 'pending_approval') && m.sets?.length > 0;
+                        const accent = STATUS_ACCENT[m.status] ?? 'border-l-gray-200';
 
                         return (
                             <div
                                 key={m.id}
-                                className={`card space-y-3 transition-opacity ${isHidden ? 'opacity-60' : ''}`}
+                                className={`rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow border-l-4 ${accent} ${isHidden ? 'opacity-60' : ''}`}
                             >
-                                {/* Hidden badge */}
-                                {isHidden && (
-                                    <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-lg px-2.5 py-1 w-fit">
-                                        <EyeOff className="w-3 h-3" />
-                                        Đang ẩn với member
-                                    </div>
-                                )}
-
-                                {/* Row 1: Teams vs */}
-                                <div className="flex items-center gap-3">
-                                    {/* Team A */}
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[10px] text-gray-400 font-medium mb-1">ĐỘI A</p>
-                                        <PlayerNames p1={m.player_a1} p2={m.player_a2} />
-                                    </div>
-
-                                    {/* Score */}
-                                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                        {hasScore ? (() => {
-                                            const s = m.sets[0];
-                                            return (
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-2xl font-black ${m.winner_team === 'A' ? 'text-green-600' : 'text-gray-400'}`}>
-                                                        {s.score_a}
-                                                    </span>
-                                                    <span className="text-gray-300 text-lg">–</span>
-                                                    <span className={`text-2xl font-black ${m.winner_team === 'B' ? 'text-green-600' : 'text-gray-400'}`}>
-                                                        {s.score_b}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })() : (
-                                            <span className="text-gray-300 text-sm">VS</span>
-                                        )}
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${STATUS_BADGE[m.status] ?? ''}`}>
-                                            {STATUS_LABEL[m.status]}
-                                        </span>
-                                    </div>
-
-                                    {/* Team B */}
-                                    <div className="flex-1 min-w-0 text-right">
-                                        <p className="text-[10px] text-gray-400 font-medium mb-1">ĐỘI B</p>
-                                        <div className="flex items-center justify-end gap-1.5">
-                                            <span className="text-sm font-medium text-gray-900 truncate max-w-[2000px]">
-                                                {m.player_b1?.full_name}
-                                            </span>
-                                            <PlayerAvatar p={m.player_b1} teamCls="bg-red-100 text-red-700" />
-                                            {m.player_b2 && (
-                                                <>
-                                                    <span className="text-gray-300">/</span>
-                                                    <span className="text-sm font-medium text-gray-900 truncate max-w-[2000px]">
-                                                        {m.player_b2?.full_name}
-                                                    </span>
-                                                    <PlayerAvatar p={m.player_b2} teamCls="bg-red-100 text-red-700" />
-                                                </>
-                                            )}
+                                <div className="p-4 space-y-4">
+                                    {isHidden && (
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-lg px-2.5 py-1 w-fit">
+                                            <EyeOff className="w-3 h-3" />
+                                            Đang ẩn với member
                                         </div>
-                                    </div>
-                                </div>
+                                    )}
 
-                                <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-50">
-                                    <div className="flex flex-col gap-1.5">
-                                        <div className="flex items-center gap-3 text-xs text-gray-400">
-                                            <span className="flex items-center gap-1">
+                                    {/* Teams + Score */}
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                                        <div className="flex-1 min-w-0 space-y-2">
+                                            <p className="text-[15px] font-semibold text-gray-400 tracking-wide">ĐỘI A</p>
+                                            <PlayerRow p={m.player_a1} />
+                                            {m.player_a2 && <PlayerRow p={m.player_a2} />}
+                                        </div>
+
+                                        <div className="flex flex-col items-center justify-center gap-1.5 flex-shrink-0 py-2 border-y sm:border-y-0 border-gray-50 text-center">
+                                            <span className="flex items-center gap-1 text-[11px] font-medium text-gray-400">
                                                 {m.match_type === 'doubles'
                                                     ? <><Users className="w-3 h-3" /> Đôi</>
                                                     : <><Trophy className="w-3 h-3" /> Đơn</>
                                                 }
                                             </span>
-                                            {m.played_at && (
-                                                <span>{format(new Date(m.played_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</span>
+
+                                            {hasScore ? (() => {
+                                                const s = m.sets[0];
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-2xl sm:text-3xl font-black tabular-nums ${m.winner_team === 'A' ? 'text-green-600' : 'text-gray-300'}`}>
+                                                            {s.score_a}
+                                                        </span>
+                                                        <span className="text-gray-300 text-lg">–</span>
+                                                        <span className={`text-2xl sm:text-3xl font-black tabular-nums ${m.winner_team === 'B' ? 'text-green-600' : 'text-gray-300'}`}>
+                                                            {s.score_b}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })() : (
+                                                <span className="text-gray-300 text-sm font-medium">VS</span>
                                             )}
+
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium whitespace-nowrap ${STATUS_BADGE[m.status] ?? ''}`}>
+                                                {STATUS_LABEL[m.status]}
+                                            </span>
+
+                                            {m.status === 'approved' && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border-2 border-green-500 bg-green-50 text-green-700 text-xs font-bold whitespace-nowrap">
+                                                    🏆 Đội {m.winner_team} thắng
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0 space-y-2">
+                                            <p className="text-[15px] font-semibold text-gray-400 tracking-wide text-right">ĐỘI B</p>
+                                            <PlayerRow p={m.player_b1} align="right" />
+                                            {m.player_b2 && <PlayerRow p={m.player_b2} align="right" />}
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                        {canApprove && showReject !== m.id && showScoreInput !== m.id && (
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleApproveClick(m)}
-                                                    disabled={busy}
-                                                    className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                                >
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                    {m.status === 'pending_result' ? 'Nhập tỉ số & Duyệt' : 'Duyệt'}
-                                                </button>
-                                                {m.status === 'pending_approval' && (
-                                                    <button
-                                                        onClick={() => setShowReject(m.id)}
-                                                        disabled={busy}
-                                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                                    >
-                                                        <XCircle className="w-3.5 h-3.5" /> Từ chối
-                                                    </button>
-                                                )}
-                                            </div>
+                                    {/* Meta row */}
+                                    <div className="flex items-center gap-3 text-xs text-gray-400 border-t border-gray-50 pt-3">
+                                        {m.played_at && (
+                                            <span className="flex items-center gap-1">
+                                                <Calendar className="w-3 h-3" />
+                                                {format(new Date(m.played_at), 'dd/MM/yyyy HH:mm', { locale: vi })}
+                                            </span>
                                         )}
-
-                                        {m.status === 'approved' && (
-                                            <div className="text-right">
-                                                <p className="text-xs text-green-600 font-medium">✅ Đã tính điểm</p>
-                                                <p className="text-[10px] text-gray-400">
-                                                    {m.winner_team === 'A'
-                                                        ? `${m.player_a1?.full_name} thắng`
-                                                        : `${m.player_b1?.full_name} thắng`}
-                                                </p>
-                                            </div>
-                                        )}
-
                                         {m.status === 'rejected' && m.reject_reason && !m.reject_reason.includes('chưa') && (
-                                            <p className="text-xs text-red-500 max-w-[160px] text-right">{m.reject_reason}</p>
+                                            <span className="text-red-500 ml-auto truncate max-w-[240px]">{m.reject_reason}</span>
                                         )}
+                                    </div>
 
-                                        {/* Nút ẩn/hiện (admin only) */}
+                                    {/* Score / Reject inline forms */}
+                                    {showScoreInput === m.id && (
+                                        <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-2.5">
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={scoreInputs[m.id]?.score_a ?? ''}
+                                                onChange={e => setScoreInputs(s => ({
+                                                    ...s,
+                                                    [m.id]: { ...s[m.id], score_a: e.target.value },
+                                                }))}
+                                                className="input-field text-sm w-20 text-center"
+                                                placeholder="Đội A"
+                                                autoFocus
+                                            />
+                                            <span className="text-gray-300">–</span>
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={scoreInputs[m.id]?.score_b ?? ''}
+                                                onChange={e => setScoreInputs(s => ({
+                                                    ...s,
+                                                    [m.id]: { ...s[m.id], score_b: e.target.value },
+                                                }))}
+                                                className="input-field text-sm w-20 text-center"
+                                                placeholder="Đội B"
+                                            />
+                                            <button
+                                                onClick={() => handleConfirmScoreAndApprove(m.id)}
+                                                disabled={busy}
+                                                className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                            >
+                                                Xác nhận duyệt
+                                            </button>
+                                            <button
+                                                onClick={() => setShowScoreInput(null)}
+                                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm rounded-lg"
+                                            >
+                                                Hủy
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {showReject === m.id && (
+                                        <div className="flex gap-2 bg-gray-50 rounded-xl p-2.5">
+                                            <input
+                                                type="text"
+                                                value={rejectReason[m.id] ?? ''}
+                                                onChange={e => setRejectReason(r => ({ ...r, [m.id]: e.target.value }))}
+                                                className="input-field text-sm flex-1"
+                                                placeholder="Lý do từ chối (bắt buộc)"
+                                                autoFocus
+                                            />
+                                            <button
+                                                onClick={() => handleReject(m.id)}
+                                                disabled={busy}
+                                                className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                            >
+                                                Xác nhận
+                                            </button>
+                                            <button
+                                                onClick={() => setShowReject(null)}
+                                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm rounded-lg"
+                                            >
+                                                Hủy
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {deleteId === m.id && (
+                                        <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl p-2.5">
+                                            <p className="text-xs text-red-600 flex-1">
+                                                Xóa vĩnh viễn trận này? Hành động không thể hoàn tác.
+                                            </p>
+                                            <button
+                                                onClick={() => handleDelete(m.id)}
+                                                disabled={actionId === m.id}
+                                                className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                            >
+                                                Xác nhận xóa
+                                            </button>
+                                            <button
+                                                onClick={() => setDeleteId(null)}
+                                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg"
+                                            >
+                                                Hủy
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Action bar */}
+                                <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-gray-50 bg-gray-50/50 rounded-b-2xl">
+                                    <div className="flex items-center gap-2">
+                                        {m.status !== 'approved' && (
+                                            <button
+                                                onClick={() => setDeleteId(m.id)}
+                                                disabled={actionId === m.id}
+                                                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-red-200 bg-white text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                                title="Xóa vĩnh viễn trận đấu"
+                                            >
+                                                <Trash2 className="w-3 h-3" /> Xóa
+                                            </button>
+                                        )}
+                                        {m.status === 'approved' && (
+                                            <button
+                                                onClick={() => setRollbackId(m.id)}
+                                                disabled={actionId === m.id}
+                                                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-orange-200 bg-white text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-50"
+                                                title="Thu hồi kết quả, hủy tỉ số và thu hồi điểm"
+                                            >
+                                                <Undo2 className="w-3 h-3" /> Hoàn tác
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => handleToggleHidden(m.id)}
-                                            className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${isHidden
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-lg border transition-colors ${isHidden
                                                 ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
                                                 : 'bg-white border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-600'
                                                 }`}
@@ -406,140 +561,30 @@ export default function MatchesAdminPage() {
                                                 : <><EyeOff className="w-3 h-3" /> Ẩn</>
                                             }
                                         </button>
-
-                                        {deleteId === m.id && (
-                                            <div className="flex items-center gap-2 pt-1 bg-red-50 border border-red-100 rounded-lg p-2.5">
-                                                <p className="text-xs text-red-600 flex-1">
-                                                    Xóa vĩnh viễn trận này? Hành động không thể hoàn tác.
-                                                </p>
-                                                <button
-                                                    onClick={() => handleDelete(m.id)}
-                                                    disabled={actionId === m.id}
-                                                    className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                                >
-                                                    Xác nhận xóa
-                                                </button>
-                                                <button
-                                                    onClick={() => setDeleteId(null)}
-                                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg"
-                                                >
-                                                    Hủy
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {rollbackId === m.id && (
-                                            <div className="flex items-center gap-2 pt-1 bg-orange-50 border border-orange-100 rounded-lg p-2.5">
-                                                <p className="text-xs text-orange-700 flex-1">
-                                                    Thu hồi kết quả? Tỉ số sẽ bị xóa, trận về "Chờ kết quả", và điểm rank + bao điểm đã cộng/trừ cho các người chơi sẽ bị thu hồi. Member sẽ nhận thông báo.
-                                                </p>
-                                                <button
-                                                    onClick={() => handleRollback(m.id)}
-                                                    disabled={actionId === m.id}
-                                                    className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                                >
-                                                    Xác nhận thu hồi
-                                                </button>
-                                                <button
-                                                    onClick={() => setRollbackId(null)}
-                                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg"
-                                                >
-                                                    Hủy
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
+
+                                    {canApprove && showReject !== m.id && showScoreInput !== m.id && (
+                                        <div className="flex gap-2">
+                                            {m.status === 'pending_approval' && (
+                                                <button
+                                                    onClick={() => setShowReject(m.id)}
+                                                    disabled={busy}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5" /> Từ chối
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleApproveClick(m)}
+                                                disabled={busy}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                            >
+                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                                {m.status === 'pending_result' ? 'Nhập tỉ số & Duyệt' : 'Duyệt'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-
-                                {m.status !== 'approved' && (
-                                    <button
-                                        onClick={() => setDeleteId(m.id)}
-                                        disabled={actionId === m.id}
-                                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
-                                        title="Xóa vĩnh viễn trận đấu"
-                                    >
-                                        <Trash2 className="w-3 h-3" /> Xóa
-                                    </button>
-                                )}
-
-                                {m.status === 'approved' && (
-                                    <button
-                                        onClick={() => setRollbackId(m.id)}
-                                        disabled={actionId === m.id}
-                                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors disabled:opacity-50"
-                                        title="Thu hồi kết quả, hủy tỉ số và thu hồi điểm"
-                                    >
-                                        <Undo2 className="w-3 h-3" /> Hoàn tác
-                                    </button>
-                                )}
-
-                                {showScoreInput === m.id && (
-                                    <div className="flex items-center gap-2 pt-1">
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={scoreInputs[m.id]?.score_a ?? ''}
-                                            onChange={e => setScoreInputs(s => ({
-                                                ...s,
-                                                [m.id]: { ...s[m.id], score_a: e.target.value },
-                                            }))}
-                                            className="input-field text-sm w-20 text-center"
-                                            placeholder="Đội A"
-                                            autoFocus
-                                        />
-                                        <span className="text-gray-300">–</span>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={scoreInputs[m.id]?.score_b ?? ''}
-                                            onChange={e => setScoreInputs(s => ({
-                                                ...s,
-                                                [m.id]: { ...s[m.id], score_b: e.target.value },
-                                            }))}
-                                            className="input-field text-sm w-20 text-center"
-                                            placeholder="Đội B"
-                                        />
-                                        <button
-                                            onClick={() => handleConfirmScoreAndApprove(m.id)}
-                                            disabled={busy}
-                                            className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                        >
-                                            Xác nhận duyệt
-                                        </button>
-                                        <button
-                                            onClick={() => setShowScoreInput(null)}
-                                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm rounded-lg"
-                                        >
-                                            Hủy
-                                        </button>
-                                    </div>
-                                )}
-
-                                {showReject === m.id && (
-                                    <div className="flex gap-2 pt-1">
-                                        <input
-                                            type="text"
-                                            value={rejectReason[m.id] ?? ''}
-                                            onChange={e => setRejectReason(r => ({ ...r, [m.id]: e.target.value }))}
-                                            className="input-field text-sm flex-1"
-                                            placeholder="Lý do từ chối (bắt buộc)"
-                                            autoFocus
-                                        />
-                                        <button
-                                            onClick={() => handleReject(m.id)}
-                                            disabled={busy}
-                                            className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg disabled:opacity-50 whitespace-nowrap"
-                                        >
-                                            Xác nhận
-                                        </button>
-                                        <button
-                                            onClick={() => setShowReject(null)}
-                                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm rounded-lg"
-                                        >
-                                            Hủy
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         );
                     })
@@ -556,6 +601,17 @@ export default function MatchesAdminPage() {
                     }}
                 />
             )}
+
+            <ConfirmModal
+                open={!!rollbackId}
+                onClose={() => setRollbackId(null)}
+                onConfirm={() => rollbackId && handleRollback(rollbackId)}
+                title="Thu hồi kết quả trận đấu?"
+                description={`Tỉ số sẽ bị xóa, trận về "Chờ kết quả".\nĐiểm rank + bao điểm đã cộng/trừ cho các người chơi sẽ bị thu hồi.\nMember sẽ nhận thông báo.`}
+                confirmLabel="Xác nhận thu hồi"
+                confirmColor="bg-orange-500 hover:bg-orange-600"
+                loading={actionId === rollbackId}
+            />
 
             {meta.total_pages > 1 && (
                 <div className="flex items-center justify-between">
