@@ -1,33 +1,47 @@
-import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Users, Menu, X, LogOut,
-  ChevronRight, Bell, User,
-  CalendarDays, Trophy, Swords,
+  LayoutDashboard,
+  Users,
+  Menu,
+  X,
+  LogOut,
+  ChevronRight,
+  Bell,
+  User,
+  CalendarDays,
+  Trophy,
+  Swords,
   ChevronDown,
-  Wallet
-} from 'lucide-react';
-import toast from 'react-hot-toast';
-import { authApi } from '../../api';
-import { useAuthStore } from '../../stores/auth.store';
+  Wallet,
+  Megaphone,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { authApi } from "../../api";
+import { useAuthStore } from "../../stores/auth.store";
 
 const navItems = [
-  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Thành viên', path: '/members', icon: Users },
-  { label: 'Buổi đánh cầu', path: '/sessions', icon: CalendarDays },
-  { label: 'Trận giao hữu', path: '/matches', icon: Swords },
-  { label: 'BXH', path: '/rankings/win-rate', icon: Trophy },
+  { label: "Dashboard", path: "/", icon: LayoutDashboard },
+  { label: "Thành viên", path: "/members", icon: Users },
+  { label: "Buổi đánh cầu", path: "/sessions", icon: CalendarDays },
+  { label: "Trận giao hữu", path: "/matches", icon: Swords },
+  { label: "Hoạt động", path: "/activities", icon: Megaphone },
+  { label: "BXH", path: "/rankings/win-rate", icon: Trophy },
   {
-    label: 'Ví',
+    label: "Ví",
     icon: Wallet,
     children: [
-      { label: 'Duyệt nạp tiền', path: '/wallets/deposits' },
-      { label: 'Tổng hợp', path: '/wallets/summary' },
+      { label: "Duyệt nạp tiền", path: "/wallets/deposits" },
+      { label: "Tổng hợp", path: "/wallets/summary" },
     ],
   },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -35,21 +49,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
   const handleLogout = async () => {
-    try { await authApi.logout(); } catch { }
+    try {
+      await authApi.logout();
+    } catch {}
     logout();
-    toast.success('Đã đăng xuất');
-    navigate('/login');
+    toast.success("Đã đăng xuất");
+    navigate("/login");
   };
 
   const toggleMenu = (label: string) => {
-    setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
+    setOpenMenus((prev) => ({ ...prev, [label]: !prev[label] }));
   };
 
   const isChildActive = (children?: { path: string }[]) =>
-    children?.some(c => location.pathname === c.path || location.pathname.startsWith(c.path)) ?? false;
+    children?.some(
+      (c) =>
+        location.pathname === c.path || location.pathname.startsWith(c.path),
+    ) ?? false;
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
-    <div className={`flex flex-col h-full bg-[#0f141f] ${mobile ? '' : 'w-64'}`}>
+    <div
+      className={`flex flex-col h-full bg-[#0f141f] ${mobile ? "" : "w-64"}`}
+    >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5">
         <div className="w-20 h-20 flex items-center justify-center flex-shrink-0">
@@ -60,8 +81,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           />
         </div>
         <div className="min-w-0">
-          <p className="text-white font-bold text-sm leading-tight tracking-tight">QUẢN TRỊ</p>
-          <p className="text-slate-500 text-[11px] font-medium">BNB BADMINTON CLUB</p>
+          <p className="text-white font-bold text-sm leading-tight tracking-tight">
+            QUẢN TRỊ
+          </p>
+          <p className="text-slate-500 text-[11px] font-medium">
+            BNB BADMINTON CLUB
+          </p>
         </div>
       </div>
 
@@ -85,21 +110,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div key={item.label}>
                 <button
                   onClick={() => toggleMenu(item.label)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${childActive
-                    ? 'bg-white/[0.06] text-white'
-                    : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
-                    }`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                    childActive
+                      ? "bg-white/[0.06] text-white"
+                      : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
+                  }`}
                 >
-                  <Icon className={`w-4 h-4 flex-shrink-0 ${childActive ? 'text-emerald-400' : ''}`} />
+                  <Icon
+                    className={`w-4 h-4 flex-shrink-0 ${childActive ? "text-emerald-400" : ""}`}
+                  />
                   <span className="flex-1 text-left">{item.label}</span>
                   <ChevronDown
-                    className={`w-3.5 h-3.5 opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                    className={`w-3.5 h-3.5 opacity-50 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
                   />
                 </button>
 
                 <div
-                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-                    }`}
+                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                    isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                  }`}
                 >
                   <div className="overflow-hidden">
                     <div className="mt-0.5 ml-[22px] pl-4 border-l border-slate-700/60 space-y-0.5 py-0.5">
@@ -112,10 +141,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             key={child.path}
                             to={child.path}
                             onClick={() => setSidebarOpen(false)}
-                            className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${active
-                              ? 'text-white font-semibold'
-                              : 'text-slate-500 hover:text-slate-200'
-                              }`}
+                            className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${
+                              active
+                                ? "text-white font-semibold"
+                                : "text-slate-500 hover:text-slate-200"
+                            }`}
                           >
                             {active && (
                               <span className="absolute -left-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -133,18 +163,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           const active =
             location.pathname === item.path ||
-            (item.path !== '/' && location.pathname.startsWith(item.path!));
+            (item.path !== "/" && location.pathname.startsWith(item.path!));
           return (
             <Link
               key={item.path}
               to={item.path!}
               onClick={() => setSidebarOpen(false)}
-              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${active
-                ? 'bg-emerald-400 text-[#0f1420] font-semibold shadow-sm shadow-emerald-900/30'
-                : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
-                }`}
+              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                active
+                  ? "bg-emerald-400 text-[#0f1420] font-semibold shadow-sm shadow-emerald-900/30"
+                  : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
+              }`}
             >
-              <Icon className={`w-4 h-4 flex-shrink-0 ${active ? '' : 'group-hover:text-slate-200'}`} />
+              <Icon
+                className={`w-4 h-4 flex-shrink-0 ${active ? "" : "group-hover:text-slate-200"}`}
+              />
               <span className="flex-1">{item.label}</span>
               {active && <ChevronRight className="w-4 h-4 opacity-70" />}
             </Link>
@@ -161,14 +194,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 src={user.avatar_url}
                 alt={user.full_name}
                 className="w-full h-full object-cover"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
               />
             ) : (
               <User className="w-4 h-4 text-white" />
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-medium truncate">{user?.full_name}</p>
+            <p className="text-white text-sm font-medium truncate">
+              {user?.full_name}
+            </p>
             <p className="text-slate-500 text-xs truncate">{user?.email}</p>
           </div>
           <button
@@ -190,16 +227,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <div
-        className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ease-out ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-          }`}
+        className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ease-out ${
+          sidebarOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
       >
         <div
           className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
           onClick={() => setSidebarOpen(false)}
         />
         <div
-          className={`relative flex flex-col w-72 h-full shadow-2xl transform transition-transform duration-300 ease-out will-change-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            }`}
+          className={`relative flex flex-col w-72 h-full shadow-2xl transform transition-transform duration-300 ease-out will-change-transform ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
         >
           <button
             onClick={() => setSidebarOpen(false)}
@@ -231,7 +272,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   src={user.avatar_url}
                   alt={user.full_name}
                   className="w-full h-full object-cover"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display =
+                      "none";
+                  }}
                 />
               ) : (
                 <User className="w-4 h-4 text-white" />
