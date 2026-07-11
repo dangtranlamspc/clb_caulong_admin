@@ -24,6 +24,7 @@ import ShirtOrderFormPage from "./components/activities/ShirtOrderFormPage";
 import TournamentFormPage from "./components/activities/TournamentFormPage";
 import EditActivityRedirect from "./pages/activities/EditActivityRedirect";
 import OfflineEventFormPage from "./pages/activities/OfflineEventFormPage";
+import ActivityRegistrationsPage from "./components/activities/ActivityRegistrationsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -269,6 +270,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <PollFormPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/activities/:id/registrations"
+          element={
+            <ProtectedRoute>
+              <ActivityRegistrationsPage />
             </ProtectedRoute>
           }
         />
