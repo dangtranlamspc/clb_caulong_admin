@@ -174,7 +174,6 @@ function ShirtOrderTable({
         {registrations.map((r: any) => {
           const badge = getPaymentMethodBadge(r);
           const isConfirmed = r.payment_status === "confirmed";
-          // Đã gửi yêu cầu (chuyển khoản/tiền mặt) nhưng chưa được admin xác nhận
           const hasPendingRequest =
             !isConfirmed &&
             (r.payment_method === "transfer" || r.payment_method === "cash");

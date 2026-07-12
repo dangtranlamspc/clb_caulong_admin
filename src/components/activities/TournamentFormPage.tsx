@@ -10,6 +10,7 @@ export default function TournamentFormPage() {
     title: "",
     emoji: "🏆",
     event_date: "",
+    deadline: "",
     status: "open",
     format: "doi",
     max_teams: "",
@@ -28,6 +29,7 @@ export default function TournamentFormPage() {
           title: data.title,
           emoji: data.emoji ?? "🏆",
           event_date: data.event_date ? data.event_date.slice(0, 16) : "",
+          deadline: data.deadline ? data.deadline.slice(0, 16) : "",
           status: data.status,
           location: data.location ?? "",
           description: data.description ?? "",
@@ -42,6 +44,13 @@ export default function TournamentFormPage() {
   const handleSubmit = async () => {
     if (!form.title.trim()) return toast.error("Vui lòng nhập tiêu đề");
     if (!form.event_date) return toast.error("Vui lòng chọn ngày thi đấu");
+    if (
+      form.deadline &&
+      form.event_date &&
+      new Date(form.deadline) > new Date(form.event_date)
+    ) {
+      return toast.error("Ngày chốt đăng ký phải trước ngày thi đấu");
+    }
 
     setSaving(true);
     try {
@@ -50,6 +59,7 @@ export default function TournamentFormPage() {
         title: form.title,
         emoji: form.emoji,
         event_date: form.event_date,
+        deadline: form.deadline || undefined,
         status: form.status,
         location: form.location || undefined,
         description: form.description || undefined,
@@ -118,6 +128,24 @@ export default function TournamentFormPage() {
             }
           />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Ngày chốt danh sách đăng ký
+          <span className="text-gray-400 font-normal"> (tuỳ chọn)</span>
+        </label>
+        <input
+          type="datetime-local"
+          className="input-field"
+          value={form.deadline}
+          onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
+        />
+        <p className="text-xs text-gray-400 mt-1">
+          Sau thời điểm này, hệ thống có thể tự động đóng đăng ký (nếu bạn cấu
+          hình job tự động), hoặc dùng làm mốc hiển thị "Deadline" cho thành
+          viên.
+        </p>
       </div>
 
       <div>

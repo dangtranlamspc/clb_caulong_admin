@@ -24,6 +24,16 @@ const STATUS_CFG: Record<string, string> = {
   cancelled: "bg-red-50 text-red-500",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  draft: "Nháp",
+  open: "Mở đăng ký",
+  upcoming: "Sắp diễn ra",
+  ongoing: "Đang diễn ra",
+  closed: "Đã đóng đăng ký",
+  completed: "Đã kết thúc",
+  cancelled: "Đã huỷ",
+};
+
 export default function ActivitiesListPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,7 +133,8 @@ export default function ActivitiesListPage() {
               <tr>
                 <th className="text-left px-4 py-3">Hoạt động</th>
                 <th className="text-left px-4 py-3">Loại</th>
-                <th className="text-left px-4 py-3">Ngày</th>
+                <th className="text-left px-4 py-3">Ngày chốt danh sách</th>
+                <th className="text-left px-4 py-3">Ngày thi đấu</th>
                 <th className="text-left px-4 py-3">Trạng thái</th>
                 <th className="text-left px-4 py-3">Đăng ký</th>
                 <th className="px-4 py-3"></th>
@@ -139,19 +150,24 @@ export default function ActivitiesListPage() {
                     {TYPE_LABEL[a.type]}
                   </td>
                   <td className="px-4 py-3 text-gray-500">
-                    {a.deadline || a.event_date
-                      ? format(
-                          new Date(a.deadline ?? a.event_date),
-                          "dd/MM/yyyy",
-                          { locale: vi },
-                        )
+                    {a.deadline
+                      ? format(new Date(a.deadline), "dd/MM/yyyy", {
+                          locale: vi,
+                        })
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {a.event_date
+                      ? format(new Date(a.event_date), "dd/MM/yyyy", {
+                          locale: vi,
+                        })
                       : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span
                       className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_CFG[a.status] ?? "bg-gray-50 text-gray-500"}`}
                     >
-                      {a.status}
+                      {STATUS_LABEL[a.status] ?? a.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
