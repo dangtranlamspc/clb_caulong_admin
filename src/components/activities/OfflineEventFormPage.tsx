@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { X } from "lucide-react";
 import toast from "react-hot-toast";
 import { activitiesAdminApi } from "../../api";
 
-const ALL_SIZES = ["S", "M", "L", "XL", "XXL", "3XL"];
-
-export default function ShirtOrderFormPage({
+export default function OfflineEventFormPage({
   activityId,
   onSaved,
   onClose,
@@ -19,12 +16,13 @@ export default function ShirtOrderFormPage({
   const navigate = useNavigate();
   const id = activityId ?? params.id;
   const [form, setForm] = useState({
-    title: "Đặt áo nhóm",
-    emoji: "👕",
-    deadline: "",
-    status: "open",
-    price_per_shirt: "",
-    available_sizes: ["S", "M", "L", "XL", "XXL"] as string[],
+    title: "",
+    emoji: "🔥",
+    location: "",
+    event_date: "",
+    status: "ongoing",
+    max_participants: "",
+    fee_per_person: "0",
     description: "",
   });
   const [loading, setLoading] = useState(!!id);
@@ -37,50 +35,40 @@ export default function ShirtOrderFormPage({
       .then(({ data }) => {
         setForm({
           title: data.title,
-          emoji: data.emoji ?? "👕",
-          deadline: data.deadline ? data.deadline.slice(0, 16) : "",
+          emoji: data.emoji ?? "🔥",
+          location: data.location ?? "",
+          event_date: data.event_date ? data.event_date.slice(0, 16) : "",
           status: data.status,
           description: data.description ?? "",
-          price_per_shirt: String(data.detail?.price_per_shirt ?? ""),
-          available_sizes: data.detail?.available_sizes ?? [
-            "S",
-            "M",
-            "L",
-            "XL",
-            "XXL",
-          ],
+          max_participants:
+            data.detail?.max_participants != null
+              ? String(data.detail.max_participants)
+              : "",
+          fee_per_person: String(data.detail?.fee_per_person ?? "0"),
         });
       })
       .finally(() => setLoading(false));
   }, [id]);
 
-  const toggleSize = (size: string) => {
-    setForm((f) => ({
-      ...f,
-      available_sizes: f.available_sizes.includes(size)
-        ? f.available_sizes.filter((s) => s !== size)
-        : [...f.available_sizes, size],
-    }));
-  };
-
   const handleSubmit = async () => {
     if (!form.title.trim()) return toast.error("Vui lòng nhập tiêu đề");
-    if (!form.deadline) return toast.error("Vui lòng chọn deadline");
-    if (form.available_sizes.length === 0)
-      return toast.error("Chọn ít nhất 1 size");
+    if (!form.event_date) return toast.error("Vui lòng chọn ngày diễn ra");
 
     setSaving(true);
     try {
       const payload = {
-        type: "shirt_order",
+        type: "offline_event",
         title: form.title,
         emoji: form.emoji,
-        deadline: form.deadline,
+        location: form.location || undefined,
+        event_date: form.event_date,
         status: form.status,
         description: form.description || undefined,
         detail: {
-          price_per_shirt: Number(form.price_per_shirt) || 0,
-          available_sizes: form.available_sizes,
+          max_participants: form.max_participants
+            ? Number(form.max_participants)
+            : null,
+          fee_per_person: Number(form.fee_per_person) || 0,
         },
       };
       if (id) await activitiesAdminApi.update(id, payload);
@@ -103,7 +91,9 @@ export default function ShirtOrderFormPage({
 
   return (
     <div className="max-w-lg mx-auto space-y-4 p-6">
-      <h1 className="text-xl font-bold text-gray-900 pr-8">👕 Đặt áo nhóm</h1>
+      <h1 className="text-xl font-bold text-gray-900">
+        🔥 Offline / BBQ & Giao lưu
+      </h1>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -116,55 +106,60 @@ export default function ShirtOrderFormPage({
         />
       </div>
 
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Địa điểm
+        </label>
+        <input
+          className="input-field"
+          value={form.location}
+          onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Deadline đăng ký
+            Ngày diễn ra
           </label>
           <input
             type="datetime-local"
             className="input-field"
-            value={form.deadline}
+            value={form.event_date}
             onChange={(e) =>
-              setForm((f) => ({ ...f, deadline: e.target.value }))
+              setForm((f) => ({ ...f, event_date: e.target.value }))
             }
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Giá / áo (đ)
+            Số người tối đa
           </label>
           <input
             type="number"
             className="input-field"
-            value={form.price_per_shirt}
+            placeholder="Không giới hạn"
+            value={form.max_participants}
             onChange={(e) =>
-              setForm((f) => ({ ...f, price_per_shirt: e.target.value }))
+              setForm((f) => ({ ...f, max_participants: e.target.value }))
             }
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Size cho phép chọn
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Phí / người
         </label>
-        <div className="flex flex-wrap gap-2">
-          {ALL_SIZES.map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => toggleSize(size)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                form.available_sizes.includes(size)
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-500 border-gray-200"
-              }`}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
+        <input
+          type="number"
+          className="input-field"
+          placeholder="0"
+          value={form.fee_per_person}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, fee_per_person: e.target.value }))
+          }
+        />
       </div>
 
       <div>
@@ -191,8 +186,11 @@ export default function ShirtOrderFormPage({
           onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
         >
           <option value="draft">Nháp</option>
-          <option value="open">Đang nhận đăng ký</option>
-          <option value="closed">Đã đóng</option>
+          <option value="open">Mở đăng ký</option>
+          <option value="upcoming">Sắp diễn ra</option>
+          <option value="ongoing">Đang diễn ra</option>
+          <option value="closed">Đã đóng đăng ký</option>
+          <option value="completed">Đã kết thúc</option>
           <option value="cancelled">Đã huỷ</option>
         </select>
       </div>

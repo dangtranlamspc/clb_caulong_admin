@@ -3,9 +3,18 @@ import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { activitiesAdminApi } from "../../api";
 
-export default function TournamentFormPage() {
-  const { id } = useParams();
+export default function TournamentFormPage({
+  activityId,
+  onSaved,
+  onClose,
+}: {
+  activityId?: string;
+  onSaved?: () => void;
+  onClose?: () => void;
+} = {}) {
+  const params = useParams();
   const navigate = useNavigate();
+  const id = activityId ?? params.id;
   const [form, setForm] = useState({
     title: "",
     emoji: "🏆",
@@ -14,6 +23,8 @@ export default function TournamentFormPage() {
     status: "open",
     format: "doi",
     max_teams: "",
+    max_slots: "",
+    entry_fee_per_person: "",
     location: "",
     description: "",
   });
@@ -36,6 +47,12 @@ export default function TournamentFormPage() {
           format: data.detail?.format ?? "doi",
           max_teams:
             data.detail?.max_teams != null ? String(data.detail.max_teams) : "",
+          max_slots:
+            data.detail?.max_slots != null ? String(data.detail.max_slots) : "",
+          entry_fee_per_person:
+            data.detail?.entry_fee_per_person != null
+              ? String(data.detail.entry_fee_per_person)
+              : "",
         });
       })
       .finally(() => setLoading(false));
@@ -66,12 +83,17 @@ export default function TournamentFormPage() {
         detail: {
           format: form.format,
           max_teams: form.max_teams ? Number(form.max_teams) : null,
+          max_slots: form.max_slots ? Number(form.max_slots) : null,
+          entry_fee_per_person: form.entry_fee_per_person
+            ? Number(form.entry_fee_per_person)
+            : 0,
         },
       };
       if (id) await activitiesAdminApi.update(id, payload);
       else await activitiesAdminApi.create(payload);
       toast.success("Đã lưu hoạt động");
-      navigate("/activities");
+      if (onSaved) onSaved();
+      else navigate("/activities");
     } catch {
     } finally {
       setSaving(false);
@@ -86,7 +108,7 @@ export default function TournamentFormPage() {
     );
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
+    <div className="max-w-lg mx-auto space-y-5 p-6">
       <h1 className="text-xl font-bold text-gray-900">🏆 Giải nội bộ</h1>
 
       <div>
@@ -130,10 +152,48 @@ export default function TournamentFormPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-3 items-start">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Max slot{" "}
+            <span className="text-gray-400 font-normal">(tuỳ chọn)</span>
+          </label>
+          <input
+            type="number"
+            className="input-field"
+            placeholder="Không giới hạn"
+            value={form.max_slots}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, max_slots: e.target.value }))
+            }
+          />
+          <p className="text-xs text-gray-400 mt-1.5 leading-snug">
+            Tổng số người chơi (tính cả đồng đội)
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Lệ phí / người
+          </label>
+          <input
+            type="number"
+            className="input-field"
+            placeholder="0"
+            value={form.entry_fee_per_person}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, entry_fee_per_person: e.target.value }))
+            }
+          />
+          <p className="text-xs text-gray-400 mt-1.5 leading-snug">
+            Đội đôi sẽ tự nhân đôi khi đăng ký
+          </p>
+        </div>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Ngày chốt danh sách đăng ký
-          <span className="text-gray-400 font-normal"> (tuỳ chọn)</span>
+          Ngày chốt danh sách đăng ký{" "}
+          <span className="text-gray-400 font-normal">(tuỳ chọn)</span>
         </label>
         <input
           type="datetime-local"
@@ -141,10 +201,9 @@ export default function TournamentFormPage() {
           value={form.deadline}
           onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
         />
-        <p className="text-xs text-gray-400 mt-1">
-          Sau thời điểm này, hệ thống có thể tự động đóng đăng ký (nếu bạn cấu
-          hình job tự động), hoặc dùng làm mốc hiển thị "Deadline" cho thành
-          viên.
+        <p className="text-xs text-gray-400 mt-1.5 leading-snug">
+          Sau thời điểm này, hệ thống có thể tự động đóng đăng ký, hoặc dùng làm
+          mốc hiển thị "Deadline" cho thành viên.
         </p>
       </div>
 

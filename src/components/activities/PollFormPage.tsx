@@ -6,9 +6,18 @@ import { activitiesAdminApi } from "../../api";
 
 type OptionForm = { id?: string; label: string; image_url?: string };
 
-export default function PollFormPage() {
-  const { id } = useParams();
+export default function PollFormPage({
+  activityId,
+  onSaved,
+  onClose,
+}: {
+  activityId?: string;
+  onSaved?: () => void;
+  onClose?: () => void;
+} = {}) {
+  const params = useParams();
   const navigate = useNavigate();
+  const id = activityId ?? params.id;
   const [form, setForm] = useState({
     title: "",
     emoji: "📊",
@@ -79,7 +88,8 @@ export default function PollFormPage() {
         });
       }
       toast.success("Đã lưu bình chọn");
-      navigate("/activities");
+      if (onSaved) onSaved();
+      else navigate("/activities");
     } catch {
     } finally {
       setSaving(false);
@@ -94,7 +104,7 @@ export default function PollFormPage() {
     );
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
+    <div className="max-w-lg mx-auto space-y-4 p-6">
       <h1 className="text-xl font-bold text-gray-900">📊 Bình chọn</h1>
 
       <div>

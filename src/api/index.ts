@@ -190,4 +190,6 @@ export const activitiesAdminApi = {
     api.get(`/admin/activities/${id}/poll-options`),
   updatePollOptions: (id: string, options: any[]) =>
     api.put(`/admin/activities/${id}/poll-options`, { options }),
+  confirmTournamentPayment: (regId: string) =>
+    api.patch(`/admin/activities/tournament-registrations/${regId}/confirm`),
 };

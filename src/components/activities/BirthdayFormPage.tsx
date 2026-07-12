@@ -5,9 +5,18 @@ import { activitiesAdminApi } from "../../api";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
-export default function BirthdayFormPage() {
-  const { id } = useParams();
+export default function BirthdayFormPage({
+  activityId,
+  onSaved,
+  onClose,
+}: {
+  activityId?: string;
+  onSaved?: () => void;
+  onClose?: () => void;
+} = {}) {
+  const params = useParams();
   const navigate = useNavigate();
+  const id = activityId ?? params.id;
   const now = new Date();
   const [form, setForm] = useState({
     title: `Sinh nhật thành viên tháng ${now.getMonth() + 1}`,
@@ -53,7 +62,8 @@ export default function BirthdayFormPage() {
       if (id) await activitiesAdminApi.update(id, payload);
       else await activitiesAdminApi.create(payload);
       toast.success("Đã lưu hoạt động");
-      navigate("/activities");
+      if (onSaved) onSaved();
+      else navigate("/activities");
     } catch {
     } finally {
       setSaving(false);
@@ -68,7 +78,7 @@ export default function BirthdayFormPage() {
     );
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
+    <div className="max-w-lg mx-auto space-y-4 p-6">
       <h1 className="text-xl font-bold text-gray-900">
         🎂 Sinh nhật thành viên
       </h1>

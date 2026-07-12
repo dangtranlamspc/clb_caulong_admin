@@ -17,14 +17,14 @@ import SessionFinishPage from "./pages/sessions/SessionFinishPage";
 import WalletAdminSummaryPage from "./pages/wallets/WalletAdminSummaryPage";
 import WalletAdminDepositePage from "./pages/wallets/WalletAdminDepositePage";
 import ActivitiesListPage from "./pages/activities/ActivitiesListPage";
-import NewActivityPage from "./pages/activities/NewActivityPage";
 import BirthdayFormPage from "./components/activities/BirthdayFormPage";
 import PollFormPage from "./components/activities/PollFormPage";
 import ShirtOrderFormPage from "./components/activities/ShirtOrderFormPage";
 import TournamentFormPage from "./components/activities/TournamentFormPage";
-import EditActivityRedirect from "./pages/activities/EditActivityRedirect";
-import OfflineEventFormPage from "./pages/activities/OfflineEventFormPage";
+import OfflineEventFormPage from "./components/activities/OfflineEventFormPage";
 import ActivityRegistrationsPage from "./components/activities/ActivityRegistrationsPage";
+import NewActivityPage from "./components/activities/NewActivityPage";
+import EditActivityRedirect from "./components/activities/EditActivityRedirect";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -174,54 +174,6 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ActivitiesListPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/activities/new"
-          element={
-            <ProtectedRoute>
-              <NewActivityPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/activities/new/shirt-order"
-          element={
-            <ProtectedRoute>
-              <ShirtOrderFormPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/activities/new/tournament"
-          element={
-            <ProtectedRoute>
-              <TournamentFormPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/activities/new/birthday"
-          element={
-            <ProtectedRoute>
-              <BirthdayFormPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/activities/new/offline-event"
-          element={
-            <ProtectedRoute>
-              <OfflineEventFormPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/activities/new/poll"
-          element={
-            <ProtectedRoute>
-              <PollFormPage />
             </ProtectedRoute>
           }
         />
