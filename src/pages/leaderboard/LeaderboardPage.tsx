@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Trophy, Medal, Star, RefreshCw } from 'lucide-react';
 import { rankingsApi } from '../../api';
 
-// Nhãn trình độ (khớp levelMap trong users.service.ts) 
 const LEVEL_LABELS: Record<string, string> = {
     yeu: 'Yếu',
     tb_yeu: 'TB yếu',
