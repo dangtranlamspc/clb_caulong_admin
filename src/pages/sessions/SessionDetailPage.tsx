@@ -33,43 +33,43 @@ import { createPortal } from "react-dom";
 import { CustomSelect } from "../../components/customs/CustomSelect";
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> =
-{
-  pendingApproval: {
-    label: "Chờ duyệt",
-    cls: "bg-orange-50 text-orange-600 border-orange-200",
-    icon: Hourglass,
-  },
-  pending: {
-    label: "Chờ thanh toán",
-    cls: "bg-amber-50 text-amber-700 border-amber-200",
-    icon: Hourglass,
-  },
-  pendingReview: {
-    label: "Chờ chốt thanh toán",
-    cls: "bg-blue-50 text-blue-700 border-blue-200",
-    icon: Eye,
-  },
-  confirmed: {
-    label: "Đã xác nhận thanh toán",
-    cls: "bg-green-50 text-green-700 border-green-200",
-    icon: CheckCircle2,
-  },
-  rejected: {
-    label: "Thanh toán bị từ chối",
-    cls: "bg-red-50 text-red-600 border-red-200",
-    icon: XCircle,
-  },
-  awaitingCheckin: {
-    label: "Chờ điểm danh",
-    cls: "bg-slate-50 text-slate-600 border border-slate-200",
-    icon: Hourglass,
-  },
-  awaitingFinish: {
-    label: "Chờ buổi đánh kết thúc",
-    cls: "bg-slate-50 text-slate-600 border border-slate-200",
-    icon: Hourglass,
-  },
-};
+  {
+    pendingApproval: {
+      label: "Chờ duyệt",
+      cls: "bg-orange-50 text-orange-600 border-orange-200",
+      icon: Hourglass,
+    },
+    pending: {
+      label: "Chờ thanh toán",
+      cls: "bg-amber-50 text-amber-700 border-amber-200",
+      icon: Hourglass,
+    },
+    pendingReview: {
+      label: "Chờ chốt thanh toán",
+      cls: "bg-blue-50 text-blue-700 border-blue-200",
+      icon: Eye,
+    },
+    confirmed: {
+      label: "Đã xác nhận thanh toán",
+      cls: "bg-green-50 text-green-700 border-green-200",
+      icon: CheckCircle2,
+    },
+    rejected: {
+      label: "Thanh toán bị từ chối",
+      cls: "bg-red-50 text-red-600 border-red-200",
+      icon: XCircle,
+    },
+    awaitingCheckin: {
+      label: "Chờ điểm danh",
+      cls: "bg-slate-50 text-slate-600 border border-slate-200",
+      icon: Hourglass,
+    },
+    awaitingFinish: {
+      label: "Chờ buổi đánh kết thúc",
+      cls: "bg-slate-50 text-slate-600 border border-slate-200",
+      icon: Hourglass,
+    },
+  };
 
 const SKILL_LABEL: Record<string, string> = {
   yeu: "Yếu",
@@ -81,12 +81,12 @@ const SKILL_LABEL: Record<string, string> = {
 };
 
 const LEVEL_LABELS: Record<string, string> = {
-  yeu: 'Yếu',
-  tb_yeu: 'TB yếu',
-  tb: 'TB',
-  tb_plus: 'TB+',
-  ban_chuyen: 'Bán chuyên (BC)',
-  chuyen_nghiep: 'Chuyên nghiệp',
+  yeu: "Yếu",
+  tb_yeu: "TB yếu",
+  tb: "TB",
+  tb_plus: "TB+",
+  ban_chuyen: "Bán chuyên (BC)",
+  chuyen_nghiep: "Chuyên nghiệp",
 };
 
 type ActionPhase = "idle" | "loading" | "success";
@@ -125,6 +125,7 @@ export default function SessionDetailPage() {
   const [guestPaidNow, setGuestPaidNow] = useState(false);
 
   const [checkingInAll, setCheckingInAll] = useState(false);
+  const [closingList, setClosingList] = useState(false);
 
   const [rollingBack, setRollingBack] = useState(false);
 
@@ -144,6 +145,33 @@ export default function SessionDetailPage() {
       setRegs(r);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCloseList = async () => {
+    if (awaitingCheckin.length === 0) return;
+    if (
+      !confirm(
+        `Chốt danh sách? ${awaitingCheckin.length} người chưa điểm danh sẽ bị đánh dấu vắng mặt và xoá khỏi buổi này. Hành động này không thể hoàn tác.`,
+      )
+    )
+      return;
+
+    setClosingList(true);
+    try {
+      const results = await Promise.allSettled(
+        awaitingCheckin.map((r) => registrationsApi.checkinAbsent(r.id)),
+      );
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+
+      if (succeeded > 0)
+        toast.success(`Đã chốt danh sách, xoá ${succeeded} người vắng mặt`);
+      if (failed > 0) toast.error(`${failed} người xử lý thất bại`);
+
+      await refreshSilently();
+    } finally {
+      setClosingList(false);
     }
   };
 
@@ -210,7 +238,7 @@ export default function SessionDetailPage() {
       ]);
       setSession(s);
       setRegs(r);
-    } catch { }
+    } catch {}
   };
 
   useEffect(() => {
@@ -482,7 +510,7 @@ export default function SessionDetailPage() {
     pendingReview.length === 0 &&
     rejected.length === 0 &&
     registrations.filter((r) => r.participation_status === "confirmed").length >
-    0;
+      0;
 
   const hostRegs = registrations.filter((r) => !r.host_registration_id);
   const guestsOf = (hostId: string) =>
@@ -671,10 +699,11 @@ export default function SessionDetailPage() {
 
                 {user?.member_type && (
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full border ${user.member_type === "co_dinh"
-                      ? "bg-purple-50 text-purple-700 border-purple-200"
-                      : "bg-gray-50 text-gray-500 border-gray-200"
-                      }`}
+                    className={`text-xs px-2 py-0.5 rounded-full border ${
+                      user.member_type === "co_dinh"
+                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                        : "bg-gray-50 text-gray-500 border-gray-200"
+                    }`}
                   >
                     {user.member_type === "co_dinh"
                       ? "🔵 Thành viên"
@@ -697,14 +726,14 @@ export default function SessionDetailPage() {
                 {(reg.payment_method === "wallet" ||
                   reg.payment_method === "wallet_grouped" ||
                   reg.payment_method === "wallet_pending_confirm") && (
-                    <span className="text-xs px-2 py-0.5 rounded-full border bg-sky-50 text-sky-700 border-sky-200 flex items-center gap-1">
-                      <Wallet className="w-3 h-3" />
-                      Ví BNB
-                      {reg.payment_method === "wallet_pending_confirm"
-                        ? " (chờ xác nhận)"
-                        : ""}
-                    </span>
-                  )}
+                  <span className="text-xs px-2 py-0.5 rounded-full border bg-sky-50 text-sky-700 border-sky-200 flex items-center gap-1">
+                    <Wallet className="w-3 h-3" />
+                    Ví BNB
+                    {reg.payment_method === "wallet_pending_confirm"
+                      ? " (chờ xác nhận)"
+                      : ""}
+                  </span>
+                )}
 
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 whitespace-nowrap ${cfg.cls}`}
@@ -731,7 +760,8 @@ export default function SessionDetailPage() {
 
                 {showCombinedHint && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium whitespace-nowrap">
-                    🔗 + khách {formatVnd(combinedGuestsTotal)} = tổng {formatVnd(totalAmount + combinedGuestsTotal)}
+                    🔗 + khách {formatVnd(combinedGuestsTotal)} = tổng{" "}
+                    {formatVnd(totalAmount + combinedGuestsTotal)}
                   </span>
                 )}
               </div>
@@ -741,19 +771,17 @@ export default function SessionDetailPage() {
                   <span>{displayGender === "male" ? "Nam" : "Nữ"}</span>
                 )}
 
-                {reg.is_guest ? (
-                  reg.guest_skill_level && (
-                    <span>
-                      · {SKILL_LABEL[reg.guest_skill_level] ?? reg.guest_skill_level}
-                    </span>
-                  )
-                ) : (
-                  user?.level && (
-                    <span>
-                      · {LEVEL_LABELS[user.level] ?? user.level}
-                    </span>
-                  )
-                )}
+                {reg.is_guest
+                  ? reg.guest_skill_level && (
+                      <span>
+                        ·{" "}
+                        {SKILL_LABEL[reg.guest_skill_level] ??
+                          reg.guest_skill_level}
+                      </span>
+                    )
+                  : user?.level && (
+                      <span>· {LEVEL_LABELS[user.level] ?? user.level}</span>
+                    )}
 
                 {reg.payment_reference && (
                   <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">
@@ -872,17 +900,34 @@ export default function SessionDetailPage() {
             <button
               onClick={handleCheckinAllPresent}
               disabled={checkingInAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold shadow-sm shadow-green-200 transition-colors flex-shrink-0 disabled:opacity-50"
             >
               {checkingInAll ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <UserCheck className="w-4 h-4" />
               )}
+              <span>Điểm danh all ({awaitingCheckin.length})</span>
+            </button>
+          )}
+
+          {awaitingCheckin.length > 0 && (
+            <button
+              onClick={handleCloseList}
+              disabled={closingList || checkingInAll}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold shadow-sm shadow-red-200 transition-colors flex-shrink-0 disabled:opacity-50"
+            >
+              {closingList ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <UserX className="w-4 h-4" />
+              )}
               <span className="hidden sm:inline">
-                Điểm danh tất cả ({awaitingCheckin.length})
+                Chốt danh sách ({awaitingCheckin.length} vắng)
               </span>
-              <span className="sm:hidden">Tất cả</span>
+              <span className="sm:hidden">
+                Chốt DS ({awaitingCheckin.length} vắng)
+              </span>
             </button>
           )}
 
@@ -899,20 +944,20 @@ export default function SessionDetailPage() {
 
           {(session.status === "waiting_payment" ||
             session.status === "completed") && (
-              <button
-                onClick={() => setShowRollbackModal(true)}
-                disabled={rollingBack}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-50"
-              >
-                {rollingBack ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Hoàn tác hóa đơn</span>
-                <span className="sm:hidden">Hoàn tác</span>
-              </button>
-            )}
+            <button
+              onClick={() => setShowRollbackModal(true)}
+              disabled={rollingBack}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-50"
+            >
+              {rollingBack ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RotateCcw className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">Hoàn tác hóa đơn</span>
+              <span className="sm:hidden">Hoàn tác</span>
+            </button>
+          )}
 
           {canComplete && (
             <button
@@ -939,7 +984,7 @@ export default function SessionDetailPage() {
           {canAddMember && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center justify-center gap-1.5 w-10 h-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors flex-shrink-0"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-200 transition-colors flex-shrink-0"
             >
               <UserPlus className="w-4 h-4" />
               <span className="hidden sm:inline">Thêm thành viên</span>
@@ -1207,16 +1252,18 @@ export default function SessionDetailPage() {
                                           : [...prev, m],
                                       );
                                     }}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${isSelected
-                                      ? "bg-blue-50"
-                                      : "hover:bg-gray-50"
-                                      }`}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                                      isSelected
+                                        ? "bg-blue-50"
+                                        : "hover:bg-gray-50"
+                                    }`}
                                   >
                                     <div
-                                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected
-                                        ? "bg-blue-600 border-blue-600"
-                                        : "border-gray-300"
-                                        }`}
+                                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${
+                                        isSelected
+                                          ? "bg-blue-600 border-blue-600"
+                                          : "border-gray-300"
+                                      }`}
                                     >
                                       {isSelected && (
                                         <CheckCircle2 className="w-3.5 h-3.5 text-white" />
@@ -1250,10 +1297,11 @@ export default function SessionDetailPage() {
                                       </p>
                                     </div>
                                     <span
-                                      className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${m.member_type === "co_dinh"
-                                        ? "bg-purple-50 text-purple-700 border-purple-200"
-                                        : "bg-gray-50 text-gray-500 border-gray-200"
-                                        }`}
+                                      className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${
+                                        m.member_type === "co_dinh"
+                                          ? "bg-purple-50 text-purple-700 border-purple-200"
+                                          : "bg-gray-50 text-gray-500 border-gray-200"
+                                      }`}
                                     >
                                       {m.member_type === "co_dinh"
                                         ? "Thành viên"
