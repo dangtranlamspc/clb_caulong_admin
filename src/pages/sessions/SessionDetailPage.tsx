@@ -672,7 +672,7 @@ export default function SessionDetailPage() {
     return (
       <div key={reg.id} className={isNested ? "" : ""}>
         <div className={isNested ? "pl-4 pr-3 py-3" : "px-4 py-3.5"}>
-          <div className="flex items-start gap-2.5">
+          <div className="flex items-start gap-3">
             {isNested && (
               <CornerDownRight className="w-3.5 h-3.5 text-gray-300 mt-1 flex-shrink-0" />
             )}
@@ -834,7 +834,7 @@ export default function SessionDetailPage() {
           </div>
 
           {actionsNode && (
-            <div className="flex items-center gap-2 flex-wrap mt-3 sm:justify-end">
+            <div className="flex gap-2 mt-3 sm:justify-end">
               {actionsNode}
             </div>
           )}
@@ -889,20 +889,23 @@ export default function SessionDetailPage() {
             `}</style>
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => navigate("/sessions")}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-xl font-bold text-gray-900 flex-1 min-w-[100px] truncate">
+
+          <h1 className="text-lg sm:text-xlfont-bold text-gray-900 truncate">
             {session.title}
           </h1>
+        </div>
 
+        <div className="  flex justify-end gap-2 overflow-x-auto pb-1 scrollbar-hide">
           {canAddMember &&
             (awaitingCheckin.length > 0 || pendingApproval.length > 0) && (
-              <span className="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg flex-shrink-0">
+              <span className="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg">
                 {pendingApproval.length > 0 &&
                   `Còn ${pendingApproval.length} đăng ký chờ duyệt`}
                 {pendingApproval.length > 0 &&
@@ -917,14 +920,10 @@ export default function SessionDetailPage() {
             <button
               onClick={handleCheckinAllPresent}
               disabled={checkingInAll}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold shadow-sm shadow-green-200 transition-colors flex-shrink-0 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-semibold"
             >
-              {checkingInAll ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <UserCheck className="w-4 h-4" />
-              )}
-              <span>Điểm danh all ({awaitingCheckin.length})</span>
+              <UserCheck className="w-4 h-4" />
+              All ({awaitingCheckin.length})
             </button>
           )}
 
@@ -932,85 +931,26 @@ export default function SessionDetailPage() {
             <button
               onClick={handleCloseList}
               disabled={closingList || checkingInAll}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold shadow-sm shadow-red-200 transition-colors flex-shrink-0 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold"
             >
-              {closingList ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <UserX className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">
-                Chốt danh sách ({awaitingCheckin.length} vắng)
-              </span>
-              <span className="sm:hidden">
-                Chốt DS ({awaitingCheckin.length} vắng)
-              </span>
-            </button>
-          )}
-
-          {canAddMember &&
-            awaitingCheckin.length === 0 &&
-            pendingApproval.length === 0 && (
-              <Link
-                to={`/sessions/${id}/finish`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors flex-shrink-0"
-              >
-                <Calculator className="w-4 h-4" /> Kết thúc
-              </Link>
-            )}
-
-          {(session.status === "waiting_payment" ||
-            session.status === "completed") && (
-              <button
-                onClick={() => setShowRollbackModal(true)}
-                disabled={rollingBack}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-50"
-              >
-                {rollingBack ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Hoàn tác hóa đơn</span>
-                <span className="sm:hidden">Hoàn tác</span>
-              </button>
-            )}
-
-          {canComplete && (
-            <button
-              onClick={async () => {
-                const msg =
-                  pending.length > 0
-                    ? `Xác nhận hoàn thành buổi đánh? ${pending.length} người đang "Chờ thanh toán" sẽ được tự động chuyển sang "Đã xác nhận thanh toán" + "Tiền mặt". Buổi sẽ bị khoá lại.`
-                    : "Xác nhận hoàn thành buổi đánh? Buổi sẽ bị khoá lại.";
-                if (!confirm(msg)) return;
-                try {
-                  await sessionsApi.complete(id!);
-                  toast.success("Đã hoàn thành và khoá buổi đánh!");
-                  refreshSilently();
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.message ?? "Thất bại");
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors flex-shrink-0"
-            >
-              <CheckCircle2 className="w-4 h-4" /> Hoàn thành
+              <UserX className="w-4 h-4" />
+              Chốt ({awaitingCheckin.length} vắng)
             </button>
           )}
 
           {canAddMember && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-200 transition-colors flex-shrink-0"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
             >
               <UserPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Thêm thành viên</span>
+              Add member
             </button>
           )}
         </div>
 
         {/* Session info card */}
-        <div className="card grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+        <div className="card grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-4 p-5 text-sm">
           <div className="flex flex-col gap-1">
             <span className="text-gray-400 text-xs">Thời gian</span>
             <div className="flex items-center gap-1 font-medium text-gray-800">
@@ -1110,7 +1050,7 @@ export default function SessionDetailPage() {
               <p>Chưa có ai đăng ký buổi này</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {hostRegs.map((host) => {
                 const guests = guestsOf(host.id);
                 const groupedGuests = guests.filter(

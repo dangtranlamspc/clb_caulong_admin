@@ -415,7 +415,7 @@ export default function MembersPage() {
                   </div>
                 </div>
                 <span className={`flex-shrink-0 ${user.is_active ? 'badge-active' : 'badge-inactive'}`}>
-                  {user.is_active ? 'Hoạt động' : 'Vô hiệu'}
+                  {user.is_active ? 'Hoạt động' : 'Vô hiệu hoá'}
                 </span>
               </div>
 

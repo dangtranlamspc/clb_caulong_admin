@@ -108,35 +108,60 @@ export default function SessionsPage() {
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="space-y-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Buổi đánh cầu</h1>
-                    <p className="text-gray-500 text-sm mt-0.5">{meta.total ?? 0} buổi</p>
+                    <h1 className="text-2xl font-bold text-gray-900">
+                        Buổi đánh cầu
+                    </h1>
+                    <p className="text-gray-500 text-sm mt-0.5">
+                        {meta.total ?? 0} buổi
+                    </p>
                 </div>
-                <div className="flex-1" />
 
-                {/* Status filter */}
-                <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-                    {[['', 'Tất cả'], ['open', 'Mở'], ['full', 'Đầy'], ['completed', 'Xong'], ['cancelled', 'Hủy']].map(
-                        ([val, lbl]) => (
+
+                {/* Filter + Create */}
+                <div className="flex items-center gap-2">
+
+                    {/* Status filter */}
+                    <div className="flex-1 flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto scrollbar-hide">
+                        {[
+                            ['', 'Tất cả'],
+                            ['open', 'Mở'],
+                            ['full', 'Đầy'],
+                            ['completed', 'Xong'],
+                            ['cancelled', 'Hủy']
+                        ].map(([val, lbl]) => (
                             <button
                                 key={val}
-                                onClick={() => setQuery(q => ({ ...q, status: val, page: 1 }))}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${query.status === val
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
+                                onClick={() =>
+                                    setQuery(q => ({
+                                        ...q,
+                                        status: val,
+                                        page: 1
+                                    }))
+                                }
+                                className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
+                                    ${query.status === val
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                    }
+                                `}
                             >
                                 {lbl}
                             </button>
-                        )
-                    )}
-                </div>
+                        ))}
+                    </div>
 
-                <Link to="/sessions/create" className="btn-primary flex items-center gap-2 text-sm px-5 py-2.5 font-medium">
-                    <Plus className="w-5 h-5" />
-                    <span className="hidden sm:inline">Tạo buổi</span>
-                </Link>
+
+                    {/* Create button */}
+                    <Link
+                        to="/sessions/create"
+                        className=" flex items-center justify-center w-11 h-11 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0"
+                    >
+                        <Plus className="w-5 h-5" />
+                    </Link>
+
+                </div>
             </div>
 
             {/* Grid */}

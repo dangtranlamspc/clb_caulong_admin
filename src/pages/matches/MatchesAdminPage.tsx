@@ -4,6 +4,8 @@ import {
     ChevronLeft, ChevronRight, RefreshCw,
     Swords, Users, Trophy, EyeOff,
     Plus, Trash2, Undo2, Calendar,
+    ChevronDown,
+    X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -130,6 +132,7 @@ export default function MatchesAdminPage() {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [rollbackId, setRollbackId] = useState<string | null>(null);
     const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+    const [showStatusModal, setShowStatusModal] = useState(false);
 
     const fetchStatusCounts = useCallback(async () => {
         try {
@@ -294,40 +297,49 @@ export default function MatchesAdminPage() {
                 </div>
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 border border-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-200 hover:bg-blue-700 transition-colors"
                 >
-                    <Plus className="w-4 h-4" /> Tạo trận
+                    <Plus className="w-4 h-4" />
+                    Tạo trận
                 </button>
             </div>
 
             {/* Tabs */}
             <div className="flex items-center gap-3">
-                <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+
+                {/* Desktop tabs */}
+                <div className="hidden sm:flex gap-1 bg-gray-100 rounded-xl p-1">
                     {STATUS_TABS.map(({ value, label, icon: Icon }) => {
-                        const count = value ? statusCounts[value] ?? 0 : statusCounts.total ?? 0;
-                        const showDot = value === 'pending_approval' && count > 0;
-                        const showCount = value !== 'pending_approval' && count > 0;
+                        const count =
+                            value
+                                ? statusCounts[value] ?? 0
+                                : statusCounts.total ?? 0;
+
+                        const showDot =
+                            value === 'pending_approval' && count > 0;
+
+                        const showCount =
+                            value !== 'pending_approval' && count > 0;
+
                         const isActive = activeTab === value;
-                        const badgeCls = STATUS_COUNT_BADGE[value] ?? 'bg-gray-200 text-gray-700';
 
                         return (
                             <button
                                 key={value}
                                 onClick={() => setTab(value)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${isActive
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition
+                                    ${isActive
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500'
+                                    }
+                                `}
                             >
-                                <span className="relative inline-flex">
-                                    <Icon className="w-4 h-4" />
-                                    {showDot && (
-                                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
-                                    )}
-                                </span>
+                                <Icon className="w-4 h-4" />
+
                                 {label}
+
                                 {showCount && (
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold leading-none ${badgeCls}`}>
+                                    <span className="text-[10px] px-1.5 rounded-full bg-gray-200">
                                         {count}
                                     </span>
                                 )}
@@ -335,7 +347,34 @@ export default function MatchesAdminPage() {
                         );
                     })}
                 </div>
-                <span className="text-sm text-gray-400 flex-shrink-0 ml-auto hidden sm:inline">{meta.total ?? 0} trận</span>
+
+                {/* Mobile dropdown */}
+                <button
+                    onClick={() => setShowStatusModal(true)}
+                    className="sm:hidden flex-1 flex items-center justify-between px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700"
+                >
+                    <span className="flex items-center gap-2">
+                        {
+                            STATUS_TABS.find(
+                                x => x.value === activeTab
+                            )?.label
+                        }
+
+                        {(statusCounts[activeTab] ?? 0) > 0 && (
+                            <span className="text-xs px-2py-0.5 rounded-full bg-gray-100 text-gray-600">
+                                {statusCounts[activeTab]}
+                            </span>
+                        )}
+                    </span>
+
+                    <ChevronDown className="w-4 h-4" />
+                </button>
+
+
+                <span className="text-sm text-gray-400 flex-shrink-0 ml-auto">
+                    {meta.total ?? 0} trận
+                </span>
+
             </div>
 
             {/* List */}
@@ -635,6 +674,120 @@ export default function MatchesAdminPage() {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {showStatusModal && createPortal(
+                <div
+                    className="fixed inset-0 z-[999] bg-black/40 flex items-end sm:hidden animate-in fade-in"
+                    onClick={() => setShowStatusModal(false)}
+                >
+
+                    <div
+                        className="w-full bg-white rounded-t-3xl p-5 shadow-xl animate-slide-up"
+                        onClick={e => e.stopPropagation()}
+                    >
+
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold text-lg">
+                                Lọc trạng thái
+                            </h3>
+
+                            <button
+                                onClick={() => setShowStatusModal(false)}
+                                className="p-2 rounded-full hover:bg-gray-100"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+
+                        <div className="space-y-2">
+
+                            {STATUS_TABS.map(({ value, label, icon: Icon }) => (
+                                <button
+                                    key={value}
+                                    onClick={() => {
+                                        setTab(value);
+                                        setShowStatusModal(false);
+                                    }}
+                                    className={`
+        w-full
+        flex
+        items-center
+        gap-3
+        px-4
+        py-3
+        rounded-xl
+        text-sm
+        font-medium
+        ${activeTab === value
+                                            ?
+                                            'bg-blue-50 text-blue-600'
+                                            :
+                                            'hover:bg-gray-50 text-gray-700'
+                                        }
+        `}
+                                >
+
+                                    <span className="relative">
+                                        <Icon className="w-5 h-5" />
+
+                                        {/* Dot thông báo chờ duyệt */}
+                                        {value === 'pending_approval' &&
+                                            (statusCounts[value] ?? 0) > 0 && (
+                                                <span
+                                                    className="
+                    absolute
+                    -top-1
+                    -right-1
+                    w-2
+                    h-2
+                    rounded-full
+                    bg-red-500
+                    ring-2
+                    ring-white
+                    "
+                                                />
+                                            )}
+                                    </span>
+
+
+                                    <span className="flex-1 text-left">
+                                        {label}
+                                    </span>
+
+
+                                    {/* Count */}
+                                    {(value !== 'pending_approval'
+                                        ? (statusCounts[value] ?? 0)
+                                        : (statusCounts[value] ?? 0)
+                                    ) > 0 && (
+                                            <span
+                                                className={`
+                text-xs
+                px-2
+                py-0.5
+                rounded-full
+                font-semibold
+
+                ${STATUS_COUNT_BADGE[value]
+                                                    ??
+                                                    'bg-gray-200 text-gray-700'
+                                                    }
+                `}
+                                            >
+                                                {statusCounts[value]}
+                                            </span>
+                                        )}
+
+                                </button>
+                            ))}
+
+                        </div>
+
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );
