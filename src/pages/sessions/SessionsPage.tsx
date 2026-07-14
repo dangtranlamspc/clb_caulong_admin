@@ -184,7 +184,10 @@ export default function SessionsPage() {
                         const busy = actionId === s.id;
 
                         return (
-                            <div key={s.id} className="card flex flex-col gap-3">
+                            <div
+                                key={s.id}
+                                className="card flex flex-col gap-3 shadow-[0_2px_16px_rgba(0,0,0,0.08),0_12px_32px_-6px_rgba(0,0,0,0.12)]"
+                            >
                                 {/* Top row */}
                                 <div className="flex items-start justify-between gap-2">
                                     <h3 className="font-semibold text-gray-900 leading-tight">{s.title}</h3>

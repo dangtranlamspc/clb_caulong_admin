@@ -723,7 +723,6 @@ export default function SessionDetailPage() {
                 )}
               </div>
 
-              {/* Hàng 2: Giới tính + trình độ */}
               <div className="flex flex-wrap gap-x-2 mt-0.5 text-xs text-gray-400">
                 {displayGender && (
                   <span>{displayGender === "male" ? "Nam" : "Nữ"}</span>
@@ -744,7 +743,6 @@ export default function SessionDetailPage() {
                 )}
               </div>
 
-              {/* Hàng 3: Badge trạng thái thanh toán + số tiền */}
               <div className="flex items-center gap-1.5 flex-wrap mt-2">
                 <span
                   className={`text-[11px] px-2 py-0.5 rounded-full border flex items-center gap-1 font-medium whitespace-nowrap ${cfg.cls}`}
@@ -938,7 +936,6 @@ export default function SessionDetailPage() {
             </button>
           )}
 
-          {/* Kết thúc buổi — chỉ hiện khi không còn ai chờ duyệt/điểm danh */}
           {canAddMember &&
             awaitingCheckin.length === 0 &&
             pendingApproval.length === 0 && (
@@ -950,7 +947,6 @@ export default function SessionDetailPage() {
               </Link>
             )}
 
-          {/* Hoàn tác hóa đơn — chỉ hiện khi buổi đang chờ thanh toán hoặc đã hoàn thành */}
           {(session.status === "waiting_payment" ||
             session.status === "completed") && (
               <button
@@ -967,7 +963,6 @@ export default function SessionDetailPage() {
               </button>
             )}
 
-          {/* Hoàn thành buổi */}
           {canComplete && (
             <button
               onClick={async () => {
@@ -1002,7 +997,7 @@ export default function SessionDetailPage() {
         </div>
 
         {/* Session info card */}
-        <div className="card grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-4 p-5 text-sm">
+        <div className="card grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-4 p-5 text-sm shadow-md">
           <div className="flex flex-col gap-1">
             <span className="text-gray-400 text-xs">Thời gian</span>
             <div className="flex items-center gap-1 font-medium text-gray-800">
@@ -1043,7 +1038,11 @@ export default function SessionDetailPage() {
           </div>
         </div>
 
-        {hasCostData && <SessionCostCard sessionId={id!} />}
+        {hasCostData && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_16px_rgba(0,0,0,0.08),0_12px_32px_-6px_rgba(0,0,0,0.12)] overflow-hidden">
+            <SessionCostCard sessionId={id!} />
+          </div>
+        )}
 
         {/* Summary badges */}
         <div className="flex gap-3 flex-wrap">
@@ -1095,9 +1094,9 @@ export default function SessionDetailPage() {
             ))}
         </div>
 
-        <div className="!p-0 overflow-hidden">
+        <div>
           {registrations.length === 0 ? (
-            <div className="card py-12 text-center text-gray-400">
+            <div className="card py-12 text-center text-gray-400 shadow-md">
               <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p>Chưa có ai đăng ký buổi này</p>
             </div>
@@ -1108,15 +1107,31 @@ export default function SessionDetailPage() {
                 const groupedGuests = guests.filter(
                   (g) => g.payment_method === "grouped_with_host",
                 );
+                const groupTotal =
+                  guests.length > 0
+                    ? (host.amount_override ?? 0) +
+                    guests.reduce((s, g) => s + (g.amount_override ?? 0), 0)
+                    : null;
+
                 return (
                   <div
                     key={host.id}
-                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                    className="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_16px_rgba(0,0,0,0.08),0_12px_32px_-6px_rgba(0,0,0,0.12)] overflow-hidden"
                   >
                     {renderRow(host, false, groupedGuests)}
                     {guests.length > 0 && (
                       <div className="bg-gray-50/70 divide-y divide-gray-100 border-t border-gray-100">
                         {guests.map((g) => renderRow(g, true))}
+                      </div>
+                    )}
+                    {groupTotal !== null && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/40">
+                        <span className="text-xs font-semibold text-gray-500">
+                          Tổng cộng
+                        </span>
+                        <span className="text-sm font-bold text-gray-900">
+                          {formatVnd(groupTotal)}
+                        </span>
                       </div>
                     )}
                   </div>
