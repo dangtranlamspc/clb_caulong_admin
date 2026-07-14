@@ -938,10 +938,62 @@ export default function SessionDetailPage() {
             </button>
           )}
 
+          {/* Kết thúc buổi — chỉ hiện khi không còn ai chờ duyệt/điểm danh */}
+          {canAddMember &&
+            awaitingCheckin.length === 0 &&
+            pendingApproval.length === 0 && (
+              <Link
+                to={`/sessions/${id}/finish`}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-semibold flex-shrink-0"
+              >
+                <Calculator className="w-4 h-4" /> Kết thúc
+              </Link>
+            )}
+
+          {/* Hoàn tác hóa đơn — chỉ hiện khi buổi đang chờ thanh toán hoặc đã hoàn thành */}
+          {(session.status === "waiting_payment" ||
+            session.status === "completed") && (
+              <button
+                onClick={() => setShowRollbackModal(true)}
+                disabled={rollingBack}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-semibold disabled:opacity-50 flex-shrink-0"
+              >
+                {rollingBack ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
+                Hoàn tác
+              </button>
+            )}
+
+          {/* Hoàn thành buổi */}
+          {canComplete && (
+            <button
+              onClick={async () => {
+                const msg =
+                  pending.length > 0
+                    ? `Xác nhận hoàn thành buổi đánh? ${pending.length} người đang "Chờ thanh toán" sẽ được tự động chuyển sang "Đã xác nhận thanh toán" + "Tiền mặt". Buổi sẽ bị khoá lại.`
+                    : "Xác nhận hoàn thành buổi đánh? Buổi sẽ bị khoá lại.";
+                if (!confirm(msg)) return;
+                try {
+                  await sessionsApi.complete(id!);
+                  toast.success("Đã hoàn thành và khoá buổi đánh!");
+                  refreshSilently();
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.message ?? "Thất bại");
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold flex-shrink-0"
+            >
+              <CheckCircle2 className="w-4 h-4" /> Hoàn thành
+            </button>
+          )}
+
           {canAddMember && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold flex-shrink-0"
             >
               <UserPlus className="w-4 h-4" />
               Add member
