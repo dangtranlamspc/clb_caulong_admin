@@ -34,7 +34,13 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
 
 const STATUS_NEXT: Record<
   string,
-  { label: string; next?: string; to?: string; cls: string }[]
+  {
+    label: string;
+    next?: string;
+    to?: string;
+    action?: "complete";
+    cls: string;
+  }[]
 > = {
   open: [
     {
@@ -63,7 +69,7 @@ const STATUS_NEXT: Record<
   waiting_payment: [
     {
       label: "Đánh dấu hoàn thành",
-      next: "completed",
+      action: "complete",
       cls: "bg-emerald-50 hover:bg-emerald-100 text-emerald-600",
     },
   ],
@@ -168,6 +174,25 @@ export default function SessionsPage() {
     }
   };
 
+  const handleComplete = async (id: string, title: string) => {
+    if (
+      !confirm(
+        `Xác nhận hoàn thành buổi "${title}"? Những người đang "Chờ thanh toán" sẽ được tự động chuyển sang "Đã xác nhận thanh toán" + "Tiền mặt". Buổi sẽ bị khoá lại.`,
+      )
+    )
+      return;
+    setActionId(id);
+    try {
+      await sessionsApi.complete(id);
+      toast.success("Đã hoàn thành và khoá buổi đánh!");
+      fetch();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Thất bại");
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const handleDelete = async (id: string, title: string) => {
     setDeleteTarget({ id, title });
   };
@@ -253,7 +278,15 @@ export default function SessionsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {sessions.map((s) => {
-            const cfg = STATUS_CONFIG[s.status] ?? STATUS_CONFIG.open;
+            const cfg =
+              s.status === "waiting_payment"
+                ? s.pending_action_count > 0
+                  ? STATUS_CONFIG.waiting_payment
+                  : {
+                      label: "Chờ chốt thanh toán",
+                      cls: "bg-indigo-100 text-indigo-700",
+                    }
+                : (STATUS_CONFIG[s.status] ?? STATUS_CONFIG.open);
             const nextActions = STATUS_NEXT[s.status] ?? [];
             const busy = actionId === s.id;
 
@@ -357,7 +390,7 @@ export default function SessionsPage() {
 
                   {nextActions.length > 0 && (
                     <div className="flex gap-1.5">
-                      {nextActions.map(({ label, next, to, cls }) =>
+                      {nextActions.map(({ label, next, to, action, cls }) =>
                         to ? (
                           <Link
                             key={to}
@@ -366,6 +399,15 @@ export default function SessionsPage() {
                           >
                             {label}
                           </Link>
+                        ) : action === "complete" ? (
+                          <button
+                            key="complete"
+                            onClick={() => handleComplete(s.id, s.title)}
+                            disabled={busy}
+                            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 ${cls}`}
+                          >
+                            {label}
+                          </button>
                         ) : (
                           <button
                             key={next}
