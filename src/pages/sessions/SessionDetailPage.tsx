@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -33,43 +33,43 @@ import { createPortal } from "react-dom";
 import { CustomSelect } from "../../components/customs/CustomSelect";
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> =
-  {
-    pendingApproval: {
-      label: "Chờ duyệt",
-      cls: "bg-orange-50 text-orange-600 border-orange-200",
-      icon: Hourglass,
-    },
-    pending: {
-      label: "Chờ thanh toán",
-      cls: "bg-amber-50 text-amber-700 border-amber-200",
-      icon: Hourglass,
-    },
-    pendingReview: {
-      label: "Chờ chốt thanh toán",
-      cls: "bg-blue-50 text-blue-700 border-blue-200",
-      icon: Eye,
-    },
-    confirmed: {
-      label: "Đã xác nhận thanh toán",
-      cls: "bg-green-50 text-green-700 border-green-200",
-      icon: CheckCircle2,
-    },
-    rejected: {
-      label: "Thanh toán bị từ chối",
-      cls: "bg-red-50 text-red-600 border-red-200",
-      icon: XCircle,
-    },
-    awaitingCheckin: {
-      label: "Chờ điểm danh",
-      cls: "bg-slate-50 text-slate-600 border border-slate-200",
-      icon: Hourglass,
-    },
-    awaitingFinish: {
-      label: "Chờ buổi đánh kết thúc",
-      cls: "bg-slate-50 text-slate-600 border border-slate-200",
-      icon: Hourglass,
-    },
-  };
+{
+  pendingApproval: {
+    label: "Chờ duyệt",
+    cls: "bg-orange-50 text-orange-600 border-orange-200",
+    icon: Hourglass,
+  },
+  pending: {
+    label: "Chờ thanh toán",
+    cls: "bg-amber-50 text-amber-700 border-amber-200",
+    icon: Hourglass,
+  },
+  pendingReview: {
+    label: "Chờ chốt thanh toán",
+    cls: "bg-blue-50 text-blue-700 border-blue-200",
+    icon: Eye,
+  },
+  confirmed: {
+    label: "Đã xác nhận thanh toán",
+    cls: "bg-green-50 text-green-700 border-green-200",
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: "Thanh toán bị từ chối",
+    cls: "bg-red-50 text-red-600 border-red-200",
+    icon: XCircle,
+  },
+  awaitingCheckin: {
+    label: "Chờ điểm danh",
+    cls: "bg-slate-50 text-slate-600 border border-slate-200",
+    icon: Hourglass,
+  },
+  awaitingFinish: {
+    label: "Chờ buổi đánh kết thúc",
+    cls: "bg-slate-50 text-slate-600 border border-slate-200",
+    icon: Hourglass,
+  },
+};
 
 const SKILL_LABEL: Record<string, string> = {
   yeu: "Yếu",
@@ -147,6 +147,10 @@ export default function SessionDetailPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchAll();
+  }, [id]);
 
   const handleCloseList = async () => {
     if (awaitingCheckin.length === 0) return;
@@ -230,51 +234,60 @@ export default function SessionDetailPage() {
     }
   };
 
+  const refreshSeqRef = useRef(0);
+  const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const refreshSilently = async () => {
+    const mySeq = ++refreshSeqRef.current;
     try {
       const [{ data: s }, { data: r }] = await Promise.all([
         sessionsApi.get(id!),
         sessionsApi.getRegistrations(id!),
       ]);
+      if (mySeq !== refreshSeqRef.current) {
+        console.log("[refreshSilently] skipped (stale)", mySeq);
+        return;
+      }
       setSession(s);
       setRegs(r);
-    } catch {}
+    } catch (err) {
+      console.error("[refreshSilently] failed:", err);
+    }
   };
 
-  useEffect(() => {
-    fetchAll();
-  }, [id]);
+  const scheduleRefresh = () => {
+    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+    refreshDebounceRef.current = setTimeout(() => {
+      refreshSilently();
+    }, 250);
+  };
 
   useEffect(() => {
     if (!id) return;
     const channel = supabase
       .channel(`session:${id}`)
       .on("broadcast", { event: "session_updated" }, () => {
-        refreshSilently();
+        scheduleRefresh();
       })
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "registrations",
-          filter: `session_id=eq.${id}`,
+        { event: "*", schema: "public", table: "registrations", filter: `session_id=eq.${id}` },
+        (payload) => {
+          console.log("[admin] registrations changed:", payload);
+          scheduleRefresh();
         },
-        () => refreshSilently(),
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "sessions",
-          filter: `id=eq.${id}`,
-        },
-        () => refreshSilently(),
+        { event: "*", schema: "public", table: "sessions", filter: `id=eq.${id}` },
+        () => scheduleRefresh(),
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log("[admin] channel status:", status, err);
+      });
     return () => {
       supabase.removeChannel(channel);
+      if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
     };
   }, [id]);
 
@@ -530,7 +543,7 @@ export default function SessionDetailPage() {
     pendingReview.length === 0 &&
     rejected.length === 0 &&
     registrations.filter((r) => r.participation_status === "confirmed").length >
-      0;
+    0;
 
   const hostRegs = registrations.filter((r) => !r.host_registration_id);
   const guestsOf = (hostId: string) =>
@@ -710,7 +723,6 @@ export default function SessionDetailPage() {
             </div>
 
             <div className="flex-1 min-w-0">
-              {/* Hàng 1: Tên + loại người */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span
                   className={`font-semibold text-gray-900 ${isNested ? "text-sm" : "text-[15px]"}`}
@@ -719,11 +731,10 @@ export default function SessionDetailPage() {
                 </span>
                 {user?.member_type && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${
-                      user.member_type === "co_dinh"
-                        ? "bg-purple-50 text-purple-700 border-purple-200"
-                        : "bg-gray-50 text-gray-500 border-gray-200"
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${user.member_type === "co_dinh"
+                      ? "bg-purple-50 text-purple-700 border-purple-200"
+                      : "bg-gray-50 text-gray-500 border-gray-200"
+                      }`}
                   >
                     {user.member_type === "co_dinh" ? "Thành viên" : "Vãng lai"}
                   </span>
@@ -741,14 +752,14 @@ export default function SessionDetailPage() {
                 )}
                 {reg.is_guest
                   ? reg.guest_skill_level && (
-                      <span>
-                        {SKILL_LABEL[reg.guest_skill_level] ??
-                          reg.guest_skill_level}
-                      </span>
-                    )
+                    <span>
+                      {SKILL_LABEL[reg.guest_skill_level] ??
+                        reg.guest_skill_level}
+                    </span>
+                  )
                   : user?.level && (
-                      <span>{LEVEL_LABELS[user.level] ?? user.level}</span>
-                    )}
+                    <span>{LEVEL_LABELS[user.level] ?? user.level}</span>
+                  )}
                 {reg.payment_reference && (
                   <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">
                     {reg.payment_reference}
@@ -793,14 +804,14 @@ export default function SessionDetailPage() {
                     !(reg.is_guest && reg.host_registration_id)) ||
                   (reg.payment_method === "wallet_pending_confirm" &&
                     !(reg.is_guest && reg.host_registration_id))) && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full border bg-sky-50 text-sky-700 border-sky-200 flex items-center gap-1 font-medium">
-                    <Wallet className="w-3 h-3" />
-                    Ví BNB
-                    {reg.payment_method === "wallet_pending_confirm"
-                      ? " (chờ xác nhận)"
-                      : ""}
-                  </span>
-                )}
+                    <span className="text-[11px] px-2 py-0.5 rounded-full border bg-sky-50 text-sky-700 border-sky-200 flex items-center gap-1 font-medium">
+                      <Wallet className="w-3 h-3" />
+                      Ví BNB
+                      {reg.payment_method === "wallet_pending_confirm"
+                        ? " (chờ xác nhận)"
+                        : ""}
+                    </span>
+                  )}
 
                 {reg.points_awarded && (
                   <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-medium">
@@ -815,12 +826,12 @@ export default function SessionDetailPage() {
                 </span>
               </div>
 
-              {showCombinedHint && (
+              {/* {showCombinedHint && (
                 <p className="text-[11px] text-indigo-600 bg-indigo-50 rounded-lg px-2 py-1 mt-1.5 font-medium">
                   + khách {formatVnd(combinedGuestsTotal)} = tổng{" "}
                   {formatVnd(totalAmount + combinedGuestsTotal)}
                 </p>
-              )}
+              )} */}
 
               {hasBreakdown && (
                 <p className="text-[11px] text-gray-400 mt-1.5">
@@ -960,19 +971,19 @@ export default function SessionDetailPage() {
 
           {(session.status === "waiting_payment" ||
             session.status === "completed") && (
-            <button
-              onClick={() => setShowRollbackModal(true)}
-              disabled={rollingBack}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-semibold disabled:opacity-50 flex-shrink-0"
-            >
-              {rollingBack ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RotateCcw className="w-4 h-4" />
-              )}
-              Hoàn tác
-            </button>
-          )}
+              <button
+                onClick={() => setShowRollbackModal(true)}
+                disabled={rollingBack}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-semibold disabled:opacity-50 flex-shrink-0"
+              >
+                {rollingBack ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
+                Hoàn tác
+              </button>
+            )}
 
           {canComplete && (
             <button
@@ -1121,7 +1132,7 @@ export default function SessionDetailPage() {
                 const groupTotal =
                   guests.length > 0
                     ? (host.amount_override ?? 0) +
-                      guests.reduce((s, g) => s + (g.amount_override ?? 0), 0)
+                    guests.reduce((s, g) => s + (g.amount_override ?? 0), 0)
                     : null;
 
                 return (
@@ -1294,18 +1305,16 @@ export default function SessionDetailPage() {
                                           : [...prev, m],
                                       );
                                     }}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                                      isSelected
-                                        ? "bg-blue-50"
-                                        : "hover:bg-gray-50"
-                                    }`}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${isSelected
+                                      ? "bg-blue-50"
+                                      : "hover:bg-gray-50"
+                                      }`}
                                   >
                                     <div
-                                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${
-                                        isSelected
-                                          ? "bg-blue-600 border-blue-600"
-                                          : "border-gray-300"
-                                      }`}
+                                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected
+                                        ? "bg-blue-600 border-blue-600"
+                                        : "border-gray-300"
+                                        }`}
                                     >
                                       {isSelected && (
                                         <CheckCircle2 className="w-3.5 h-3.5 text-white" />
@@ -1339,11 +1348,10 @@ export default function SessionDetailPage() {
                                       </p>
                                     </div>
                                     <span
-                                      className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${
-                                        m.member_type === "co_dinh"
-                                          ? "bg-purple-50 text-purple-700 border-purple-200"
-                                          : "bg-gray-50 text-gray-500 border-gray-200"
-                                      }`}
+                                      className={`text-[10px] px-2 py-0.5 rounded-full border flex-shrink-0 ${m.member_type === "co_dinh"
+                                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                                        : "bg-gray-50 text-gray-500 border-gray-200"
+                                        }`}
                                     >
                                       {m.member_type === "co_dinh"
                                         ? "Thành viên"

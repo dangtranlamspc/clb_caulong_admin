@@ -110,6 +110,10 @@ export default function SessionsPage() {
       );
       const { data } = await sessionsApi.list(params);
       const sorted = [...(data.data ?? [])].sort((a: any, b: any) => {
+        const aReopen = a.reopened_at ? new Date(a.reopened_at).getTime() : 0;
+        const bReopen = b.reopened_at ? new Date(b.reopened_at).getTime() : 0;
+        if (aReopen !== bReopen) return bReopen - aReopen;
+
         const aTime = new Date(a.created_at ?? a.scheduled_at).getTime();
         const bTime = new Date(b.created_at ?? b.scheduled_at).getTime();
         return bTime - aTime;
@@ -241,11 +245,10 @@ export default function SessionsPage() {
                   }))
                 }
                 className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
-                                    ${
-                                      query.status === val
-                                        ? "bg-white text-gray-900 shadow-sm"
-                                        : "text-gray-500 hover:text-gray-700"
-                                    }
+                                    ${query.status === val
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                  }
                                 `}
               >
                 {lbl}
@@ -283,9 +286,9 @@ export default function SessionsPage() {
                 ? s.pending_action_count > 0
                   ? STATUS_CONFIG.waiting_payment
                   : {
-                      label: "Chờ chốt thanh toán",
-                      cls: "bg-indigo-100 text-indigo-700",
-                    }
+                    label: "Chờ chốt thanh toán",
+                    cls: "bg-indigo-100 text-indigo-700",
+                  }
                 : (STATUS_CONFIG[s.status] ?? STATUS_CONFIG.open);
             const nextActions = STATUS_NEXT[s.status] ?? [];
             const busy = actionId === s.id;

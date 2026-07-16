@@ -108,17 +108,6 @@ export const registrationsApi = {
 };
 
 export const matchesApi = {
-  // Member
-  create: (data: any) => api.post("/matches", data),
-  myList: (params?: any) => api.get("/matches/my", { params }),
-  get: (id: string) => api.get(`/matches/${id}`),
-  accept: (id: string) => api.patch(`/matches/${id}/accept`),
-  decline: (id: string, reason?: string) =>
-    api.patch(`/matches/${id}/decline`, { reason }),
-  submitResult: (id: string, data: any) =>
-    api.patch(`/matches/${id}/result`, data),
-
-  // Admin
   list: (params?: any) => api.get("/matches", { params }),
   approve: (
     id: string,
