@@ -22,6 +22,7 @@ import TournamentFormPage from "../../components/activities/TournamentFormPage";
 import ModalActivities from "../../components/activities/ModalActivities";
 import ActivityRegistrationsPage from "../../components/activities/ActivityRegistrationsPage";
 import ActivityTypeFilterDropdown from "../../components/activities/ActivityTypeFilterDropdown";
+import { useNavigate } from "react-router-dom";
 
 const TYPE_LABEL: Record<string, string> = {
   shirt_order: "👕 Đặt áo",
@@ -73,6 +74,7 @@ const TYPE_OPTIONS = Object.entries(TYPE_LABEL).map(([value, label]) => ({
 }));
 
 export default function ActivitiesListPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("");
@@ -122,7 +124,21 @@ export default function ActivitiesListPage() {
 
   const handleTypeSelect = (type: string) => {
     setShowTypePicker(false);
+
+    if (type === "tournament") {
+      navigate("/activities/new/tournament");
+      return;
+    }
+
     setTimeout(() => setSelectedType(type), 200);
+  };
+
+  const handleEditClick = (a: any) => {
+    if (a.type === "tournament") {
+      navigate(`/activities/${a.id}/edit/tournament`);
+      return;
+    }
+    setEditingActivity({ id: a.id, type: a.type });
   };
 
   const handleFormSaved = () => {
@@ -265,9 +281,7 @@ export default function ActivitiesListPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() =>
-                            setEditingActivity({ id: a.id, type: a.type })
-                          }
+                          onClick={() => handleEditClick(a)}
                           className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-blue-600"
                         >
                           <Pencil className="w-4 h-4" />
@@ -376,7 +390,6 @@ export default function ActivitiesListPage() {
         <ActivityTypePicker onSelect={handleTypeSelect} />
       </ModalActivities>
 
-      {/* Modal: form tạo hoạt động theo loại đã chọn */}
       <ModalActivities
         open={!!selectedType}
         onClose={() => setSelectedType(null)}

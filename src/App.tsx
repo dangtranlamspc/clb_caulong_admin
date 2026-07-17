@@ -235,6 +235,23 @@ export default function App() {
           }
         />
 
+        <Route
+          path="/activities/new/tournament"
+          element={
+            <ProtectedRoute>
+              <TournamentFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/activities/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EditActivityRedirect />
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
