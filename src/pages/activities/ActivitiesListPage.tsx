@@ -119,7 +119,7 @@ export default function ActivitiesListPage() {
       await activitiesAdminApi.delete(id);
       toast.success("Đã xoá");
       fetchList();
-    } catch {}
+    } catch { }
   };
 
   const handleTypeSelect = (type: string) => {
@@ -188,11 +188,10 @@ export default function ActivitiesListPage() {
       <div className="hidden md:flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
         <button
           onClick={() => setTypeFilter("")}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            !typeFilter
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${!typeFilter
               ? "bg-white text-gray-900 shadow-sm"
               : "text-gray-500 hover:text-gray-700"
-          }`}
+            }`}
         >
           Tất cả
         </button>
@@ -200,11 +199,10 @@ export default function ActivitiesListPage() {
           <button
             key={opt.value}
             onClick={() => setTypeFilter(opt.value)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-              typeFilter === opt.value
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${typeFilter === opt.value
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
           >
             {opt.label}
           </button>
@@ -260,15 +258,15 @@ export default function ActivitiesListPage() {
                     <td className="px-4 py-3 text-gray-500">
                       {a.deadline
                         ? format(new Date(a.deadline), "dd/MM/yyyy", {
-                            locale: vi,
-                          })
+                          locale: vi,
+                        })
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {a.event_date
                         ? format(new Date(a.event_date), "dd/MM/yyyy", {
-                            locale: vi,
-                          })
+                          locale: vi,
+                        })
                         : "—"}
                     </td>
                     <td className="px-4 py-3">
@@ -409,7 +407,6 @@ export default function ActivitiesListPage() {
         )}
       </ModalActivities>
 
-      {/* Modal: chỉnh sửa hoạt động */}
       <ModalActivities
         open={!!editingActivity}
         onClose={() => setEditingActivity(null)}
@@ -423,7 +420,6 @@ export default function ActivitiesListPage() {
         )}
       </ModalActivities>
 
-      {/* Modal: xem đăng ký */}
       <ModalActivities
         open={!!viewingRegistrationsId}
         onClose={() => setViewingRegistrationsId(null)}

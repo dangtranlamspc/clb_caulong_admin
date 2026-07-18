@@ -11,6 +11,11 @@ import {
   ChevronLeft,
   RotateCcw,
   Loader2,
+  X,
+  Landmark,
+  Banknote,
+  Wallet,
+  CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -32,6 +37,18 @@ const STATUS_LABEL: Record<string, string> = {
   ongoing: "Đang diễn ra",
   completed: "Đã kết thúc",
   cancelled: "Đã huỷ",
+};
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  wallet: "Ví BNB",
+  transfer: "Chuyển khoản",
+  cash: "Tiền mặt",
+};
+
+const PAYMENT_METHOD_ICON: Record<string, any> = {
+  wallet: Wallet,
+  transfer: Landmark,
+  cash: Banknote,
 };
 
 const GENDER_OPTIONS = [
@@ -88,6 +105,11 @@ export default function TournamentRegistrationsPage() {
   const [teamCount, setTeamCount] = useState("8");
   const [drawing, setDrawing] = useState(false);
 
+  // Xác nhận thanh toán: đăng ký đang được chọn để xem chi tiết trước khi
+  // admin bấm xác nhận (áp dụng cho chuyển khoản & tiền mặt).
+  const [confirmTarget, setConfirmTarget] = useState<any>(null);
+  const [confirming, setConfirming] = useState(false);
+
   const load = async () => {
     if (!id) return;
     setLoading(true);
@@ -107,7 +129,6 @@ export default function TournamentRegistrationsPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -171,7 +192,6 @@ export default function TournamentRegistrationsPage() {
   };
 
   const handleLevelChange = async (regId: string, level: string) => {
-    // Optimistic update — cần thêm API admin cập nhật level cho 1 đăng ký nếu muốn lưu thật.
     setRegistrations((prev) =>
       prev.map((r) => (r.id === regId ? { ...r, level } : r)),
     );
@@ -184,15 +204,28 @@ export default function TournamentRegistrationsPage() {
       await activitiesAdminApi.removeRegistration("tournament", regId);
       toast.success("Đã xoá đăng ký");
       load();
-    } catch {}
+    } catch { }
   };
 
-  const handleConfirmPayment = async (regId: string) => {
+  // Mở modal xác nhận thay vì confirm ngay khi bấm — để admin thấy rõ
+  // phương thức (chuyển khoản / tiền mặt) và nội dung trước khi xác nhận.
+  const openConfirmPayment = (r: any) => {
+    if (r.payment_status === "confirmed") return;
+    setConfirmTarget(r);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!confirmTarget) return;
+    setConfirming(true);
     try {
-      await activitiesAdminApi.confirmTournamentPayment(regId);
+      await activitiesAdminApi.confirmTournamentPayment(confirmTarget.id);
       toast.success("Đã xác nhận thanh toán");
+      setConfirmTarget(null);
       load();
-    } catch {}
+    } catch {
+    } finally {
+      setConfirming(false);
+    }
   };
 
   const handleDrawTeams = async () => {
@@ -220,40 +253,44 @@ export default function TournamentRegistrationsPage() {
   }
 
   return (
-    <div className="w-full p-6 space-y-5">
+    <div className="w-full p-4 sm:p-6 space-y-5">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-sm text-gray-400">
+      <div className="flex items-center gap-1.5 text-sm text-gray-400 overflow-x-auto whitespace-nowrap">
         <button
           onClick={() => navigate("/activities")}
           className="hover:text-gray-600"
         >
           Giải đấu
         </button>
-        <ChevronRight className="w-3.5 h-3.5" />
+        <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
         <span className="text-gray-500">{activity?.title}</span>
-        <ChevronRight className="w-3.5 h-3.5" />
+        <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
         <span className="text-gray-900 font-medium">Quản lý đăng ký</span>
       </div>
 
       {/* Title row */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
             Vận động viên đăng ký
           </h1>
           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-orange-50 text-orange-600">
             {STATUS_LABEL[activity?.status] ?? activity?.status}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Xuất danh sách
+        <div className="flex items-center gap-2 flex-wrap">
+          <button className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Xuất danh sách</span>
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
-            <Filter className="w-4 h-4" /> Bộ lọc
+          <button className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 md:hidden">
+            <Filter className="w-4 h-4" />
+            <span>Bộ lọc</span>
           </button>
-          <button className="btn-primary flex items-center gap-2 text-sm px-4 py-2 font-medium">
-            <Users className="w-4 h-4" /> Chia đội theo trình độ
+          <button className="btn-primary flex items-center gap-2 text-sm px-3 sm:px-4 py-2 font-medium">
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">Chia đội theo trình độ</span>
+            <span className="sm:hidden">Chia đội</span>
           </button>
         </div>
       </div>
@@ -310,11 +347,13 @@ export default function TournamentRegistrationsPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
         {/* Left: filters + table */}
         <div className="space-y-4 min-w-0">
+          {/* Bộ lọc: Giới tính & Trình độ thu hẹp lại (2 cột) để nhường chỗ
+              cho Thanh toán rộng hơn (3 cột) + nút Xóa lọc riêng 1 cột. */}
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
-              <div className="md:col-span-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-12 gap-3 items-end">
+              <div className="col-span-2 sm:col-span-3 lg:col-span-3">
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  &nbsp;
+                  Tìm kiếm
                 </label>
                 <input
                   className="input-field"
@@ -323,7 +362,7 @@ export default function TournamentRegistrationsPage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <div>
+              <div className="lg:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">
                   Giới tính
                 </label>
@@ -333,7 +372,7 @@ export default function TournamentRegistrationsPage() {
                   options={GENDER_OPTIONS}
                 />
               </div>
-              <div>
+              <div className="lg:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">
                   Trình độ
                 </label>
@@ -343,7 +382,7 @@ export default function TournamentRegistrationsPage() {
                   options={LEVEL_OPTIONS}
                 />
               </div>
-              <div>
+              <div className="lg:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">
                   Vai trò
                 </label>
@@ -353,28 +392,30 @@ export default function TournamentRegistrationsPage() {
                   options={GENDER_OPTIONS}
                 />
               </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-gray-500 mb-1 whitespace-nowrap">
-                    Thanh toán
-                  </label>
-                  <CustomSelect
-                    value={paymentFilter}
-                    onChange={setPaymentFilter}
-                    options={PAYMENT_OPTIONS}
-                  />
-                </div>
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Thanh toán
+                </label>
+                <CustomSelect
+                  value={paymentFilter}
+                  onChange={setPaymentFilter}
+                  options={PAYMENT_OPTIONS}
+                />
+              </div>
+              <div className="lg:col-span-1">
                 <button
                   onClick={clearFilters}
-                  className="mb-0.5 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 self-end"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" /> Xóa lọc
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="lg:hidden">Xóa lọc</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {/* ── Desktop/tablet: bảng ── */}
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
@@ -446,11 +487,10 @@ export default function TournamentRegistrationsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`text-xs font-medium px-2 py-1 rounded-full ${
-                            r.role === "nam"
+                          className={`text-xs font-medium px-2 py-1 rounded-full ${r.role === "nam"
                               ? "bg-blue-50 text-blue-600"
                               : "bg-pink-50 text-pink-600"
-                          }`}
+                            }`}
                         >
                           VĐV {r.role === "nam" ? "Nam" : "Nữ"}
                         </span>
@@ -461,21 +501,17 @@ export default function TournamentRegistrationsPage() {
                       <td className="px-4 py-3 text-gray-500">
                         {r.created_at
                           ? format(new Date(r.created_at), "dd/MM/yyyy HH:mm", {
-                              locale: vi,
-                            })
+                            locale: vi,
+                          })
                           : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <button
-                          onClick={() =>
-                            r.payment_status !== "confirmed" &&
-                            handleConfirmPayment(r.id)
-                          }
-                          className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                            r.payment_status === "confirmed"
-                              ? "bg-green-50 text-green-700"
+                          onClick={() => openConfirmPayment(r)}
+                          className={`text-xs font-medium px-2.5 py-1 rounded-full ${r.payment_status === "confirmed"
+                              ? "bg-green-50 text-green-700 cursor-default"
                               : "bg-amber-50 text-amber-600 hover:bg-amber-100"
-                          }`}
+                            }`}
                         >
                           {r.payment_status === "confirmed"
                             ? "Đã thanh toán"
@@ -514,56 +550,130 @@ export default function TournamentRegistrationsPage() {
               </table>
             </div>
 
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-500">
-              <span>
-                Hiển thị {(page - 1) * PAGE_SIZE + 1} -{" "}
-                {Math.min(page * PAGE_SIZE, filtered.length)} trong tổng số{" "}
-                {filtered.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                {Array.from({ length: Math.min(totalPages, 4) }, (_, idx) => {
-                  const p = idx + 1;
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={`w-8 h-8 rounded-lg text-sm font-medium ${
-                        page === p
-                          ? "bg-blue-600 text-white"
-                          : "border border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-                {totalPages > 4 && (
-                  <span className="px-1 text-gray-400">…</span>
-                )}
-                {totalPages > 4 && (
-                  <button
-                    onClick={() => setPage(totalPages)}
-                    className="w-8 h-8 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50"
-                  >
-                    {totalPages}
-                  </button>
-                )}
-                <button
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              filteredCount={filtered.length}
+              pageSize={PAGE_SIZE}
+              onChange={setPage}
+            />
+          </div>
+
+          {/* ── Mobile: danh sách dạng thẻ ── */}
+          <div className="md:hidden space-y-3">
+            {pageItems.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 text-center py-10 text-gray-400 text-sm">
+                Không có vận động viên nào phù hợp bộ lọc
               </div>
-            </div>
+            )}
+            {pageItems.map((r, i) => (
+              <div
+                key={r.id}
+                className="bg-white rounded-xl border border-gray-200 p-4 space-y-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img
+                      src={
+                        r.users?.avatar_url ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(r.users?.full_name ?? "?")}`
+                      }
+                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                      alt=""
+                    />
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 truncate">
+                        {r.users?.full_name ?? "—"}
+                      </p>
+                      <p className="text-xs text-gray-400 truncate">
+                        {r.users?.phone ?? "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400 flex-shrink-0">
+                    #{(page - 1) * PAGE_SIZE + i + 1}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`text-xs font-medium px-2 py-1 rounded-full ${r.role === "nam"
+                        ? "bg-blue-50 text-blue-600"
+                        : "bg-pink-50 text-pink-600"
+                      }`}
+                  >
+                    VĐV {r.role === "nam" ? "Nam" : "Nữ"}
+                  </span>
+                  {r.role === "nam" ? (
+                    <select
+                      value={r.level ?? ""}
+                      onChange={(e) => handleLevelChange(r.id, e.target.value)}
+                      className="text-xs font-semibold rounded-lg px-2.5 py-1 border-0 outline-none cursor-pointer"
+                      style={levelPillStyle(r.level)}
+                    >
+                      {["A", "B+", "B", "C"].map((lv) => (
+                        <option key={lv} value={lv}>
+                          {lv}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span
+                      className="text-xs font-semibold rounded-lg px-2.5 py-1"
+                      style={levelPillStyle(null)}
+                    >
+                      —
+                    </span>
+                  )}
+                  <button
+                    onClick={() => openConfirmPayment(r)}
+                    className={`text-xs font-medium px-2.5 py-1 rounded-full ${r.payment_status === "confirmed"
+                        ? "bg-green-50 text-green-700"
+                        : "bg-amber-50 text-amber-600"
+                      }`}
+                  >
+                    {r.payment_status === "confirmed"
+                      ? "Đã thanh toán"
+                      : "Chưa thanh toán"}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-50">
+                  <span>
+                    {r.created_at
+                      ? format(new Date(r.created_at), "dd/MM/yyyy HH:mm", {
+                        locale: vi,
+                      })
+                      : "—"}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600">
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-blue-600">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteReg(r.id)}
+                      className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {pageItems.length > 0 && (
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                filteredCount={filtered.length}
+                pageSize={PAGE_SIZE}
+                onChange={setPage}
+                compact
+              />
+            )}
           </div>
         </div>
 
@@ -629,6 +739,171 @@ export default function TournamentRegistrationsPage() {
             đội.
           </div>
         </div>
+      </div>
+
+      {/* Modal xác nhận thanh toán — dành cho chuyển khoản & tiền mặt (ví BNB
+          đã tự động xác nhận ngay khi thanh toán nên hiếm khi cần bấm ở đây). */}
+      {confirmTarget && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center sm:justify-center"
+          onClick={(e) =>
+            e.target === e.currentTarget && setConfirmTarget(null)
+          }
+        >
+          <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="font-bold text-gray-900">Xác nhận thanh toán</p>
+              <button onClick={() => setConfirmTarget(null)}>
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <img
+                src={
+                  confirmTarget.users?.avatar_url ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(confirmTarget.users?.full_name ?? "?")}`
+                }
+                className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+                alt=""
+              />
+              <div className="min-w-0">
+                <p className="font-medium text-gray-900 truncate">
+                  {confirmTarget.users?.full_name ?? "—"}
+                </p>
+                <p className="text-xs text-gray-400 truncate">
+                  {confirmTarget.users?.phone ?? "—"}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-3.5 space-y-2.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Phương thức</span>
+                <span className="flex items-center gap-1.5 font-medium text-gray-900">
+                  {(() => {
+                    const Icon =
+                      PAYMENT_METHOD_ICON[confirmTarget.payment_method] ??
+                      Banknote;
+                    return <Icon className="w-3.5 h-3.5" />;
+                  })()}
+                  {PAYMENT_METHOD_LABEL[confirmTarget.payment_method] ??
+                    "Chưa chọn"}
+                </span>
+              </div>
+              {confirmTarget.payment_method === "transfer" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Nội dung CK</span>
+                  <span className="font-mono font-medium text-red-600">
+                    {confirmTarget.payment_reference ?? "—"}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Số tiền</span>
+                <span className="font-semibold text-gray-900">
+                  {(
+                    confirmTarget.amount_override ??
+                    activity?.detail?.entry_fee_per_person ??
+                    0
+                  ).toLocaleString("vi-VN")}
+                  đ
+                </span>
+              </div>
+            </div>
+
+            {!confirmTarget.payment_method && (
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg p-2.5">
+                Vận động viên này chưa chọn phương thức thanh toán — kiểm tra
+                lại trước khi xác nhận.
+              </p>
+            )}
+
+            <button
+              onClick={handleConfirmPayment}
+              disabled={confirming}
+              className="w-full flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50"
+            >
+              {confirming ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Xác nhận đã nhận thanh toán
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  filteredCount,
+  pageSize,
+  onChange,
+  compact,
+}: {
+  page: number;
+  totalPages: number;
+  filteredCount: number;
+  pageSize: number;
+  onChange: (p: number) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between ${compact
+          ? "bg-white rounded-xl border border-gray-200 px-4 py-3"
+          : "px-4 py-3 border-t border-gray-100"
+        } text-sm text-gray-500`}
+    >
+      <span className="text-xs sm:text-sm">
+        Hiển thị {(page - 1) * pageSize + 1} -{" "}
+        {Math.min(page * pageSize, filteredCount)} trong tổng số{" "}
+        {filteredCount}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          disabled={page === 1}
+          onClick={() => onChange(page - 1)}
+          className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        {Array.from({ length: Math.min(totalPages, 4) }, (_, idx) => {
+          const p = idx + 1;
+          return (
+            <button
+              key={p}
+              onClick={() => onChange(p)}
+              className={`w-8 h-8 rounded-lg text-sm font-medium ${page === p
+                  ? "bg-blue-600 text-white"
+                  : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+            >
+              {p}
+            </button>
+          );
+        })}
+        {totalPages > 4 && <span className="px-1 text-gray-400">…</span>}
+        {totalPages > 4 && (
+          <button
+            onClick={() => onChange(totalPages)}
+            className="w-8 h-8 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50"
+          >
+            {totalPages}
+          </button>
+        )}
+        <button
+          disabled={page === totalPages}
+          onClick={() => onChange(page + 1)}
+          className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
