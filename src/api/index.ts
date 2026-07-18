@@ -181,4 +181,16 @@ export const activitiesAdminApi = {
     api.put(`/admin/activities/${id}/poll-options`, { options }),
   confirmTournamentPayment: (regId: string) =>
     api.patch(`/admin/activities/tournament-registrations/${regId}/confirm`),
+  drawTeams: (id: string, data: any) =>
+    api.post(`/admin/activities/${id}/tournament/draw-teams`, data),
+};
+
+export const uploadsAdminApi = {
+  upload: (file: File, folder: "logos" | "banners" | "uploads" = "uploads") => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post(`/admin/uploads?folder=${folder}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 };

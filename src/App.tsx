@@ -23,8 +23,8 @@ import ShirtOrderFormPage from "./components/activities/ShirtOrderFormPage";
 import TournamentFormPage from "./components/activities/TournamentFormPage";
 import OfflineEventFormPage from "./components/activities/OfflineEventFormPage";
 import ActivityRegistrationsPage from "./components/activities/ActivityRegistrationsPage";
-import NewActivityPage from "./components/activities/NewActivityPage";
 import EditActivityRedirect from "./components/activities/EditActivityRedirect";
+import TournamentRegistrationsPage from "./components/activities/TournamentRegistrationsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -248,6 +248,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <EditActivityRedirect />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/activities/:id/registrations/tournament"
+          element={
+            <ProtectedRoute>
+              <TournamentRegistrationsPage />
             </ProtectedRoute>
           }
         />

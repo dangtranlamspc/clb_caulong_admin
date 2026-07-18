@@ -141,6 +141,14 @@ export default function ActivitiesListPage() {
     setEditingActivity({ id: a.id, type: a.type });
   };
 
+  const handleViewRegistrations = (a: any) => {
+    if (a.type === "tournament") {
+      navigate(`/activities/${a.id}/registrations/tournament`);
+      return;
+    }
+    setViewingRegistrationsId(a.id);
+  };
+
   const handleFormSaved = () => {
     setSelectedType(null);
     fetchList();
@@ -272,7 +280,7 @@ export default function ActivitiesListPage() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setViewingRegistrationsId(a.id)}
+                        onClick={() => handleViewRegistrations(a)}
                         className="flex items-center gap-1 text-blue-600 hover:underline"
                       >
                         <Users className="w-3.5 h-3.5" /> Xem
@@ -300,7 +308,6 @@ export default function ActivitiesListPage() {
             </table>
           </div>
 
-          {/* ── Mobile: card list ── */}
           <div className="md:hidden space-y-3">
             {items.map((a) => (
               <div
@@ -353,7 +360,7 @@ export default function ActivitiesListPage() {
 
                 <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-50 bg-gray-50/50">
                   <button
-                    onClick={() => setViewingRegistrationsId(a.id)}
+                    onClick={() => handleViewRegistrations(a)}
                     className="flex items-center gap-1.5 text-sm text-blue-600 font-medium py-1"
                   >
                     <Users className="w-4 h-4" /> Xem đăng ký
