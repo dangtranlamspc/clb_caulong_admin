@@ -386,7 +386,6 @@ export default function ActivitiesListPage() {
         </>
       )}
 
-      {/* Modal: chọn loại hoạt động */}
       <ModalActivities
         open={showTypePicker}
         onClose={() => setShowTypePicker(false)}

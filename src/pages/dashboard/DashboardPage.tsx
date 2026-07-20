@@ -328,7 +328,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -343,7 +342,6 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           icon={Users}
@@ -376,9 +374,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Middle row: Buổi đánh / Tài chính / Biểu đồ thu chi */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Buổi đánh */}
         <div className="card relative overflow-hidden">
           <div className="flex items-center gap-2 mb-5">
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -453,7 +449,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Biểu đồ thu chi */}
         <div className="card">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h3 className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Biểu đồ thu chi</h3>
@@ -506,7 +501,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bottom row: Bảng xếp hạng / Thông báo / Sự kiện */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Bảng xếp hạng */}
         <div className="card flex flex-col">
@@ -598,7 +592,6 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Thông báo mới nhất */}
         <div className="card flex flex-col">
           <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-4">Thông báo mới nhất</h3>
           <div className="space-y-3 flex-1">
@@ -624,7 +617,6 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Sự kiện sắp tới */}
         <div className="card flex flex-col">
           <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-4">Sự kiện sắp tới</h3>
           <div className="space-y-5 flex-1">
