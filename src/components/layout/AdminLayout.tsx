@@ -51,10 +51,10 @@ export default function AdminLayout({
   const handleLogout = async () => {
     try {
       await authApi.logout();
-    } catch {}
-    logout();
-    toast.success("Đã đăng xuất");
-    navigate("/login");
+    } finally {
+      useAuthStore.getState().logout();
+      window.location.href = "/auth/login";
+    }
   };
 
   const toggleMenu = (label: string) => {
@@ -110,11 +110,10 @@ export default function AdminLayout({
               <div key={item.label}>
                 <button
                   onClick={() => toggleMenu(item.label)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-                    childActive
-                      ? "bg-white/[0.06] text-white"
-                      : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
-                  }`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${childActive
+                    ? "bg-white/[0.06] text-white"
+                    : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
+                    }`}
                 >
                   <Icon
                     className={`w-4 h-4 flex-shrink-0 ${childActive ? "text-emerald-400" : ""}`}
@@ -126,9 +125,8 @@ export default function AdminLayout({
                 </button>
 
                 <div
-                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                    isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                  }`}
+                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                    }`}
                 >
                   <div className="overflow-hidden">
                     <div className="mt-0.5 ml-[22px] pl-4 border-l border-slate-700/60 space-y-0.5 py-0.5">
@@ -141,11 +139,10 @@ export default function AdminLayout({
                             key={child.path}
                             to={child.path}
                             onClick={() => setSidebarOpen(false)}
-                            className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${
-                              active
-                                ? "text-white font-semibold"
-                                : "text-slate-500 hover:text-slate-200"
-                            }`}
+                            className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${active
+                              ? "text-white font-semibold"
+                              : "text-slate-500 hover:text-slate-200"
+                              }`}
                           >
                             {active && (
                               <span className="absolute -left-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -169,11 +166,10 @@ export default function AdminLayout({
               key={item.path}
               to={item.path!}
               onClick={() => setSidebarOpen(false)}
-              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-                active
-                  ? "bg-emerald-400 text-[#0f1420] font-semibold shadow-sm shadow-emerald-900/30"
-                  : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
-              }`}
+              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${active
+                ? "bg-emerald-400 text-[#0f1420] font-semibold shadow-sm shadow-emerald-900/30"
+                : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
+                }`}
             >
               <Icon
                 className={`w-4 h-4 flex-shrink-0 ${active ? "" : "group-hover:text-slate-200"}`}
@@ -227,20 +223,18 @@ export default function AdminLayout({
       </div>
 
       <div
-        className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ease-out ${
-          sidebarOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ease-out ${sidebarOpen
+          ? "opacity-100 pointer-events-auto"
+          : "opacity-0 pointer-events-none"
+          }`}
       >
         <div
           className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
           onClick={() => setSidebarOpen(false)}
         />
         <div
-          className={`relative flex flex-col w-72 h-full shadow-2xl transform transition-transform duration-300 ease-out will-change-transform ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={`relative flex flex-col w-72 h-full shadow-2xl transform transition-transform duration-300 ease-out will-change-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
         >
           <button
             onClick={() => setSidebarOpen(false)}
